@@ -3,13 +3,36 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-val keystoreProps = Properties().apply {
-    val f = rootProject.file("key.properties")
-    if (f.exists()) f.inputStream().use { load(it) }
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+}
+fun signingValue(environmentName: String, propertyName: String): String? =
+    System.getenv(environmentName)?.takeIf { it.isNotBlank() }
+        ?: keystoreProperties.getProperty(propertyName)?.takeIf { it.isNotBlank() }
+
+tasks.configureEach {
+    if (name == "preReleaseBuild") {
+        doFirst {
+            val requiredValues = mapOf(
+                "ANDROID_KEYSTORE_PATH / storeFile" to signingValue("ANDROID_KEYSTORE_PATH", "storeFile"),
+                "ANDROID_KEYSTORE_PASSWORD / storePassword" to signingValue("ANDROID_KEYSTORE_PASSWORD", "storePassword"),
+                "ANDROID_KEY_ALIAS / keyAlias" to signingValue("ANDROID_KEY_ALIAS", "keyAlias"),
+                "ANDROID_KEY_PASSWORD / keyPassword" to signingValue("ANDROID_KEY_PASSWORD", "keyPassword"),
+            )
+            val missing = requiredValues.filterValues { it == null }.keys
+            check(missing.isEmpty()) {
+                "Release signing is required. Missing: ${missing.joinToString()}"
+            }
+            check(file(signingValue("ANDROID_KEYSTORE_PATH", "storeFile")!!).isFile) {
+                "Release keystore file does not exist."
+            }
+        }
+    }
 }
 
 android {
@@ -23,36 +46,25 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.nonthachai.privatewebhub"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
-        // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
-        // You can force using the value of versionCode by specifying the `-P force-version-code-ignoring-abi=true`
-        // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     signingConfigs {
-        if (keystoreProps.containsKey("storeFile")) {
-            create("release") {
-                storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
-                storePassword = keystoreProps.getProperty("storePassword")
-                keyAlias = keystoreProps.getProperty("keyAlias")
-                keyPassword = keystoreProps.getProperty("keyPassword")
-            }
+        create("release") {
+            keyAlias = signingValue("ANDROID_KEY_ALIAS", "keyAlias")
+            keyPassword = signingValue("ANDROID_KEY_PASSWORD", "keyPassword")
+            storePassword = signingValue("ANDROID_KEYSTORE_PASSWORD", "storePassword")
+            storeFile = signingValue("ANDROID_KEYSTORE_PATH", "storeFile")?.let { file(it) }
         }
     }
 
     buildTypes {
         release {
-            // Falls back to debug signing when no keystore is configured.
-            signingConfig = signingConfigs.findByName("release")
-                ?: signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }
