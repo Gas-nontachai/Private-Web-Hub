@@ -7,10 +7,68 @@ import 'package:movieapps/src/core/catalog.dart';
 void main() {
   final source = File('assets/catalog/websites.json').readAsStringSync();
 
-  test('bundled catalog has the three sites', () {
+  test('bundled catalog has the configured sites once', () {
     final c = Catalog.parse(source);
-    expect(c.sites.map((s) => s.name), ['SerieDay', '037HDD', 'GoSeries4K']);
+    expect(c.sites.map((s) => s.name), [
+      'SerieDay',
+      '037HDD',
+      'GoSeries4K',
+      'AnimeRuka',
+    ]);
+    expect(c.sites.map((s) => s.id).toSet().length, c.sites.length);
     expect(c.sites.every((s) => s.url.scheme == 'https'), isTrue);
+    expect(c.sites.map((s) => s.category), [
+      'หนัง/ซีรี่ย์',
+      'หนัง/ซีรี่ย์',
+      'หนัง/ซีรี่ย์',
+      'อนิเมะ',
+    ]);
+  });
+
+  test('configured search URLs encode Thai text and reserved characters', () {
+    final c = Catalog.parse(source);
+    final site = c.sites.singleWhere((s) => s.id == 'serieday');
+    expect(
+      buildSearchUri(site, 'รักนะ & 2026').toString(),
+      'https://www.serieday-z.com/search_movie/?keyword=%E0%B8%A3%E0%B8%B1%E0%B8%81%E0%B8%99%E0%B8%B0+%26+2026',
+    );
+    expect(
+      buildSearchUri(
+        c.sites.singleWhere((s) => s.id == '037hdd'),
+        'a+b',
+      ).toString(),
+      'https://www.037-hdd.com/?s=a%2Bb',
+    );
+    expect(
+      buildSearchUri(
+        c.sites.singleWhere((s) => s.id == 'goseries4k'),
+        'test',
+      ).toString(),
+      'https://www.goseries4k.com/?s=test',
+    );
+    expect(
+      buildSearchUri(
+        c.sites.singleWhere((s) => s.id == 'animeruka'),
+        'รัก & a+b',
+      ).toString(),
+      'https://animeruka.com/?s=%E0%B8%A3%E0%B8%B1%E0%B8%81+%26+a%2Bb',
+    );
+    expect(
+      c.sites
+          .singleWhere((s) => s.id == 'animeruka')
+          .rules
+          .single
+          .actions
+          .single
+          .selectors,
+      [
+        '#box-side-r',
+        '#box-side-l',
+        '[id^="ad-group-"]',
+        '#box-footer-fix',
+        '.ar-adgrid',
+      ],
+    );
   });
 
   test(

@@ -6,6 +6,8 @@ import '../core/updates.dart';
 import '../theme/theme.dart';
 import 'browser_page.dart';
 import 'history_page.dart';
+import 'library_page.dart';
+import 'search_page.dart';
 import 'settings_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -18,74 +20,223 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  final _queries = ['', '', ''];
+  final _search = TextEditingController();
+  int _tab = 0;
+
+  @override
+  void dispose() {
+    widget.settings.faviconRevision.removeListener(_refreshFavicons);
+    _search.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
+    widget.settings.faviconRevision.addListener(_refreshFavicons);
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => checkForUpdates(context, manual: false),
     );
   }
 
+  void _refreshFavicons() {
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
-    final catalog = widget.catalog;
-    final settings = widget.settings;
+    final pages = [
+      _explore(),
+      LibraryPage(
+        catalog: widget.catalog,
+        settings: widget.settings,
+        embedded: true,
+        query: _queries[1],
+      ),
+      HistoryPage(
+        catalog: widget.catalog,
+        settings: widget.settings,
+        embedded: true,
+        query: _queries[2],
+      ),
+    ];
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Container(
-            clipBehavior: Clip.antiAlias,
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Palette.panel,
-              borderRadius: BorderRadius.circular(Design.panelRadius),
-              border: Border.all(color: Palette.border),
+      appBar: AppBar(
+        toolbarHeight: 76,
+        title: TextField(
+          key: const ValueKey('unified-search'),
+          controller: _search,
+          decoration: InputDecoration(
+            hintText: _tab == 0
+                ? 'ค้นหาหนังและซีรีส์'
+                : _tab == 1
+                ? 'ค้นหาในรายการบันทึก'
+                : 'ค้นหาในประวัติ',
+            prefixIcon: IconButton(
+              tooltip: 'ค้นหาจากเว็บไซต์',
+              icon: const Icon(Icons.search),
+              onPressed: () {
+                FocusScope.of(context).unfocus();
+                _startSearch();
+              },
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: Palette.accent,
-                    borderRadius: BorderRadius.circular(999),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+          ),
+          onChanged: (value) {
+            setState(() => _queries[_tab] = value);
+          },
+          textInputAction: TextInputAction.search,
+          onSubmitted: (_) {
+            if (_tab == 0) _startSearch();
+          },
+        ),
+        actions: [
+          PopupMenuButton<String>(
+            tooltip: 'More options',
+            onSelected: (value) async {
+              if (value == 'settings') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => SettingsPage(
+                      catalog: widget.catalog,
+                      settings: widget.settings,
+                    ),
                   ),
+                );
+              } else if (value == 'clear-history') {
+                final clear = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('ล้างประวัติ?'),
+                    content: const Text('รายการโปรดและดูภายหลังจะยังคงอยู่'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('ยกเลิก'),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('ล้าง'),
+                      ),
+                    ],
+                  ),
+                );
+                if (clear == true) {
+                  await widget.settings.clearHistory();
+                  if (mounted) setState(() {});
+                }
+              }
+            },
+            itemBuilder: (_) => [
+              if (_tab == 2 && widget.settings.history.isNotEmpty)
+                const PopupMenuItem(
+                  value: 'clear-history',
+                  child: Text('ล้างประวัติ'),
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
+              const PopupMenuItem(value: 'settings', child: Text('Settings')),
+            ],
+          ),
+        ],
+      ),
+      body: IndexedStack(index: _tab, children: pages),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tab,
+        onDestinationSelected: (index) {
+          setState(() {
+            _tab = index;
+            _search.text = _queries[index];
+          });
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore),
+            label: 'Explore',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.favorite_border),
+            selectedIcon: Icon(Icons.favorite),
+            label: 'Favorites',
+          ),
+          NavigationDestination(icon: Icon(Icons.history), label: 'History'),
+        ],
+      ),
+    );
+  }
+
+  Widget _explore() => GridView.builder(
+    padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
+    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 3,
+      crossAxisSpacing: 14,
+      mainAxisSpacing: 18,
+      childAspectRatio: .82,
+    ),
+    itemCount: widget.catalog.sites.length,
+    itemBuilder: (context, index) {
+      final site = widget.catalog.sites[index];
+      return Semantics(
+        button: true,
+        label: '${site.name}, ${site.url.host}',
+        child: InkWell(
+          key: ValueKey('site-${site.id}'),
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => BrowserPage(
+                site: site,
+                catalog: widget.catalog,
+                settings: widget.settings,
+              ),
+            ),
+          ),
+          child: Column(
+            children: [
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Palette.appSurface,
+                    border: Border.all(color: Palette.appTextMuted, width: 1.5),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  alignment: Alignment.center,
+                  child: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      const Expanded(
-                        child: Text(
-                          'เลือกเว็บไซต์',
-                          style: TextStyle(
-                            fontSize: Design.headingSize,
-                            fontWeight: FontWeight.w600,
+                      if (widget.settings.favicon(site.id) case final icon?)
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Image.memory(
+                            icon,
+                            fit: BoxFit.contain,
+                            cacheWidth: 256,
+                            errorBuilder: (_, _, _) => _siteMark(site.mark),
                           ),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'History',
-                        icon: const Icon(Icons.history),
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => HistoryPage(
-                              catalog: catalog,
-                              settings: settings,
+                        )
+                      else
+                        _siteMark(site.mark),
+                      Positioned(
+                        top: 5,
+                        right: 5,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Palette.appSurfaceActive,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 3,
                             ),
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Settings',
-                        icon: const Icon(Icons.settings),
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => SettingsPage(
-                              catalog: catalog,
-                              settings: settings,
+                            child: Text(
+                              site.category,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ),
@@ -93,125 +244,52 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                 ),
-                Expanded(
-                  child: ListView.separated(
-                    itemCount: catalog.sites.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(height: Design.siteGap),
-                    itemBuilder: (context, i) => _SiteLink(
-                      site: catalog.sites[i],
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => BrowserPage(
-                            site: catalog.sites[i],
-                            catalog: catalog,
-                            settings: settings,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SiteLink extends StatefulWidget {
-  const _SiteLink({required this.site, required this.onTap});
-  final Site site;
-  final VoidCallback onTap;
-
-  @override
-  State<_SiteLink> createState() => _SiteLinkState();
-}
-
-class _SiteLinkState extends State<_SiteLink> {
-  bool _active = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final site = widget.site;
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _active = true),
-      onTapCancel: () => setState(() => _active = false),
-      onTapUp: (_) => setState(() => _active = false),
-      child: InkWell(
-        key: ValueKey('site-${site.id}'),
-        borderRadius: BorderRadius.circular(Design.linkRadius),
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: Design.transitionMs),
-          constraints: const BoxConstraints(minHeight: Design.linkMinHeight),
-          padding: const EdgeInsets.symmetric(
-            horizontal: Design.paddingX,
-            vertical: Design.paddingY,
-          ),
-          decoration: BoxDecoration(
-            color: _active ? Palette.accentSoft : Colors.white,
-            borderRadius: BorderRadius.circular(Design.linkRadius),
-            border: Border.all(
-              color: _active ? Palette.accent : Colors.transparent,
-              width: 2,
-            ),
-          ),
-          child: Row(
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: Design.transitionMs),
-                width: Design.markSize,
-                height: Design.markSize,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: _active ? Palette.accent : Palette.mark,
-                  borderRadius: BorderRadius.circular(Design.markRadius),
-                ),
-                child: Text(
-                  site.mark,
-                  style: TextStyle(
-                    fontSize: Design.markFontSize,
-                    fontWeight: FontWeight.w600,
-                    color: _active ? Palette.markHover : Colors.white,
-                  ),
-                ),
               ),
-              const SizedBox(width: Design.contentGap),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      site.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: Design.nameSize,
-                        fontWeight: FontWeight.w600,
-                        color: Palette.ink,
-                      ),
-                    ),
-                    Text(
-                      site.url.host,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: Design.hostSize,
-                        color: Palette.muted,
-                      ),
-                    ),
-                  ],
-                ),
+              const SizedBox(height: 8),
+              Text(
+                site.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-              const Padding(
-                padding: EdgeInsets.only(right: 3),
-                child: Icon(Icons.chevron_right, size: 20, color: Palette.mark),
+              Text(
+                site.url.host,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Palette.appTextMuted,
+                ),
               ),
             ],
           ),
+        ),
+      );
+    },
+  );
+
+  Widget _siteMark(String mark) => Center(
+    child: Text(
+      mark,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: Palette.appText,
+        fontSize: mark.length > 3 ? 22 : 36,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
+
+  void _startSearch() {
+    final query = _search.text.trim();
+    if (query.isEmpty) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SearchPage(
+          catalog: widget.catalog,
+          settings: widget.settings,
+          query: query,
         ),
       ),
     );

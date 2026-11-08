@@ -54,6 +54,17 @@
     },
     {
       "matches": [
+        "https://animeruka.com/*",
+        "http://animeruka.com/*"
+      ],
+      "css": [
+        "rules/animeruka.css"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
         "https://*/*",
         "http://*/*"
       ],

@@ -5,11 +5,13 @@
     {
       "id": "serieday",
       "name": "SerieDay",
+      "category": "หนัง/ซีรี่ย์",
       "mark": "SD",
       "url": "https://www.serieday-z.com/",
       "hosts": [
         "www.serieday-z.com"
       ],
+      "search": { "path": "/search_movie/", "queryKey": "keyword" },
       "enabled": true,
       "rules": [
         {
@@ -35,11 +37,13 @@
     {
       "id": "037hdd",
       "name": "037HDD",
+      "category": "หนัง/ซีรี่ย์",
       "mark": "037",
       "url": "https://www.037-hdd.com/",
       "hosts": [
         "www.037-hdd.com"
       ],
+      "search": { "path": "/", "queryKey": "s" },
       "enabled": true,
       "rules": [
         {
@@ -65,12 +69,14 @@
     {
       "id": "goseries4k",
       "name": "GoSeries4K",
+      "category": "หนัง/ซีรี่ย์",
       "mark": "G4K",
       "url": "https://www.goseries4k.com/",
       "hosts": [
         "goseries4k.com",
         "www.goseries4k.com"
       ],
+      "search": { "path": "/", "queryKey": "s" },
       "enabled": true,
       "rules": [
         {
@@ -86,6 +92,39 @@
               "selectors": [
                 "[class^=\"vipx-\"]",
                 "[class*=\" vipx-\"]"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "animeruka",
+      "name": "AnimeRuka",
+      "category": "อนิเมะ",
+      "mark": "AR",
+      "url": "https://animeruka.com/",
+      "hosts": [
+        "animeruka.com"
+      ],
+      "search": { "path": "/", "queryKey": "s" },
+      "enabled": true,
+      "rules": [
+        {
+          "id": "animeruka-hide-ads",
+          "hosts": [
+            "animeruka.com"
+          ],
+          "enabled": true,
+          "actions": [
+            {
+              "type": "hide",
+              "selectors": [
+                "#box-side-r",
+                "#box-side-l",
+                "[id^=\"ad-group-\"]",
+                "#box-footer-fix",
+                ".ar-adgrid"
               ]
             }
           ]

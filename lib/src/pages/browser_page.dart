@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +9,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/catalog.dart';
 import '../core/settings.dart';
 
+enum BrowserLoadState { loading, loaded, failed }
+
 class BrowserPage extends StatefulWidget {
   const BrowserPage({
     super.key,
@@ -15,11 +18,17 @@ class BrowserPage extends StatefulWidget {
     required this.catalog,
     required this.settings,
     this.initialUrl,
+    this.onLoadStateChanged,
+    this.handleSystemBack = true,
+    this.loadTimeout,
   });
   final Site site;
   final Catalog catalog;
   final SiteSettings settings;
   final Uri? initialUrl;
+  final ValueChanged<BrowserLoadState>? onLoadStateChanged;
+  final bool handleSystemBack;
+  final Duration? loadTimeout;
 
   @override
   State<BrowserPage> createState() => _BrowserPageState();
@@ -34,6 +43,7 @@ class _BrowserPageState extends State<BrowserPage> {
   String? _error;
   bool _canGoBack = false;
   bool _canGoForward = false;
+  Timer? _loadTimeout;
 
   @override
   void initState() {
@@ -42,7 +52,9 @@ class _BrowserPageState extends State<BrowserPage> {
   }
 
   Future<void> _prepareScript() async {
-    final template = await rootBundle.loadString('assets/runtime/rule_runtime.js');
+    final template = await rootBundle.loadString(
+      'assets/runtime/rule_runtime.js',
+    );
     if (!mounted) return;
     setState(() {
       _script = UserScript(
@@ -58,6 +70,12 @@ class _BrowserPageState extends State<BrowserPage> {
         forMainFrameOnly: false,
       );
     });
+  }
+
+  @override
+  void dispose() {
+    _loadTimeout?.cancel();
+    super.dispose();
   }
 
   Future<void> _refreshNavState() async {
@@ -87,9 +105,9 @@ class _BrowserPageState extends State<BrowserPage> {
   Widget build(BuildContext context) {
     final script = _script;
     return PopScope(
-      canPop: false,
+      canPop: !widget.handleSystemBack,
       onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) return;
+        if (didPop || !widget.handleSystemBack) return;
         final c = _controller;
         if (c != null && await c.canGoBack()) {
           await c.goBack();
@@ -123,6 +141,23 @@ class _BrowserPageState extends State<BrowserPage> {
               tooltip: 'Home',
               icon: const Icon(Icons.home),
               onPressed: () => Navigator.of(context).pop(),
+            ),
+            PopupMenuButton<String>(
+              tooltip: 'Save page',
+              icon: const Icon(Icons.bookmark_add_outlined),
+              onSelected: _saveCurrentPage,
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'favorite', child: Text('รายการโปรด')),
+                PopupMenuItem(value: 'watchLater', child: Text('ดูภายหลัง')),
+              ],
+            ),
+            IconButton(
+              tooltip: 'Open in external browser',
+              icon: const Icon(Icons.open_in_browser),
+              onPressed: () async {
+                final url = await _controller?.getUrl();
+                if (url != null) await _openExternal(url.uriValue);
+              },
             ),
           ],
           bottom: _progress < 1
@@ -166,6 +201,8 @@ class _BrowserPageState extends State<BrowserPage> {
                         callback: (args) => _nativeTap(args),
                       );
                     },
+                    onReceivedIcon: (_, icon) =>
+                        widget.settings.saveFavicon(widget.site.id, icon),
                     shouldOverrideUrlLoading: (c, action) async {
                       final uri = action.request.url?.uriValue;
                       if (uri == null) return NavigationActionPolicy.CANCEL;
@@ -176,20 +213,39 @@ class _BrowserPageState extends State<BrowserPage> {
                       await _openExternal(uri);
                       return NavigationActionPolicy.CANCEL;
                     },
-                    onLoadStart: (c, url) => setState(() => _error = null),
+                    onLoadStart: (c, url) {
+                      _loadTimeout?.cancel();
+                      final timeout = widget.loadTimeout;
+                      if (timeout != null) {
+                        _loadTimeout = Timer(timeout, () {
+                          if (!mounted) return;
+                          setState(() => _error = 'Timed out');
+                          widget.onLoadStateChanged?.call(
+                            BrowserLoadState.failed,
+                          );
+                          _controller?.stopLoading();
+                        });
+                      }
+                      setState(() => _error = null);
+                      widget.onLoadStateChanged?.call(BrowserLoadState.loading);
+                    },
                     onProgressChanged: (c, p) =>
                         setState(() => _progress = p / 100),
                     onLoadStop: (c, url) async {
+                      _loadTimeout?.cancel();
                       // Rules are idempotent, so reapplying after navigation is safe.
                       await c.evaluateJavascript(source: script.source);
                       await _refreshNavState();
-                    },
-                    onUpdateVisitedHistory: (c, url, _) async {
-                      await _refreshNavState();
                       final uri = url?.uriValue;
+                      widget.onLoadStateChanged?.call(
+                        _error == null
+                            ? BrowserLoadState.loaded
+                            : BrowserLoadState.failed,
+                      );
                       if (uri != null &&
                           decideNavigation(uri, widget.catalog) ==
-                              NavDecision.allowInApp) {
+                              NavDecision.allowInApp &&
+                          _error == null) {
                         await widget.settings.recordVisit(
                           widget.site,
                           uri,
@@ -197,15 +253,26 @@ class _BrowserPageState extends State<BrowserPage> {
                         );
                       }
                     },
+                    onUpdateVisitedHistory: (c, url, _) async {
+                      await _refreshNavState();
+                    },
                     onReceivedError: (c, request, error) {
                       if (request.isForMainFrame ?? false) {
+                        _loadTimeout?.cancel();
                         setState(() => _error = error.description);
+                        widget.onLoadStateChanged?.call(
+                          BrowserLoadState.failed,
+                        );
                       }
                     },
                     onReceivedHttpError: (c, request, response) {
                       if ((request.isForMainFrame ?? false) &&
                           (response.statusCode ?? 0) >= 400) {
+                        _loadTimeout?.cancel();
                         setState(() => _error = 'HTTP ${response.statusCode}');
+                        widget.onLoadStateChanged?.call(
+                          BrowserLoadState.failed,
+                        );
                       }
                     },
                     // Default behavior cancels on TLS errors; never proceed.
@@ -233,6 +300,41 @@ class _BrowserPageState extends State<BrowserPage> {
               ),
       ),
     );
+  }
+
+  Future<void> _saveCurrentPage(String collection) async {
+    final url = await _controller?.getUrl();
+    if (url == null ||
+        decideNavigation(url.uriValue, widget.catalog) !=
+            NavDecision.allowInApp) {
+      return;
+    }
+    final title = await _controller?.getTitle() ?? '';
+    Object? rawPoster;
+    try {
+      rawPoster = await _controller?.evaluateJavascript(
+        source: """document.querySelector('meta[property="og:image"]')?.content || document.querySelector('meta[name="twitter:image"]')?.content || ''""",
+      );
+    } catch (_) {}
+    final poster = rawPoster is String && rawPoster.trim().isNotEmpty
+        ? url.uriValue.resolve(rawPoster.trim())
+        : null;
+    await widget.settings.toggleSavedPage(
+      widget.site,
+      url.uriValue,
+      title,
+      collection,
+      posterUrl:
+          poster != null &&
+              (poster.scheme == 'https' || poster.scheme == 'http')
+          ? poster.toString()
+          : null,
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('รายการบันทึกอัปเดตแล้ว')));
+    }
   }
 
   // Only taps requested by an allowlisted page are forwarded to native input.

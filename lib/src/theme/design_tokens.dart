@@ -12,6 +12,11 @@ class Palette {
   static const muted = Color(0xFF6D7F9F);
   static const white = Color(0xFFFFFFFF);
   static const border = Color(0x1FFFFFFF);
+  static const appBackground = Color(0xFF121212);
+  static const appSurface = Color(0xFF262626);
+  static const appSurfaceActive = Color(0xFF414141);
+  static const appText = Color(0xFFF2F2F2);
+  static const appTextMuted = Color(0xFFC6C6C6);
 }
 
 class Design {

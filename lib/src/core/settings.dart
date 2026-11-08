@@ -1,5 +1,5 @@
 import 'dart:convert';
-
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'catalog.dart';
@@ -8,6 +8,23 @@ import 'catalog.dart';
 class SiteSettings {
   SiteSettings(this._prefs);
   final SharedPreferences _prefs;
+  final faviconRevision = ValueNotifier<int>(0);
+
+  Uint8List? favicon(String siteId) {
+    final value = _prefs.getString('site_favicon_$siteId');
+    if (value == null) return null;
+    try {
+      return base64Decode(value);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveFavicon(String siteId, Uint8List bytes) async {
+    if (bytes.isEmpty || bytes.length > 512 * 1024) return;
+    await _prefs.setString('site_favicon_$siteId', base64Encode(bytes));
+    faviconRevision.value++;
+  }
 
   List<BrowseEntry> get history {
     try {
@@ -29,7 +46,13 @@ class SiteSettings {
 
   Future<void> recordVisit(Site site, Uri url, String? title) async {
     final uri = url.replace(fragment: '').toString();
-    final entries = history.where((e) => e.url != uri).toList();
+    final identity = normalizeIdentityUrl(url);
+    final entries = history.where((e) {
+      final oldUrl = Uri.tryParse(e.url);
+      return e.siteId != site.id ||
+          oldUrl == null ||
+          normalizeIdentityUrl(oldUrl) != identity;
+    }).toList();
     entries.insert(
       0,
       BrowseEntry(
@@ -59,6 +82,89 @@ class SiteSettings {
 
   Future<void> clearHistory() => _prefs.remove('browse_history');
 
+  List<SavedPage> savedPages(String collection) {
+    try {
+      final values =
+          jsonDecode(_prefs.getString('saved_pages') ?? '[]') as List;
+      return [
+        for (final value in values)
+          if (value is Map<String, dynamic> &&
+              value['collection'] == collection)
+            SavedPage.fromJson(value),
+      ];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> toggleSavedPage(
+    Site site,
+    Uri url,
+    String title,
+    String collection, {
+    String? posterUrl,
+  }) async {
+    final identity = normalizeIdentityUrl(url);
+    final pages = <SavedPage>[];
+    try {
+      final values =
+          jsonDecode(_prefs.getString('saved_pages') ?? '[]') as List;
+      pages.addAll(
+        values.whereType<Map<String, dynamic>>().map(SavedPage.fromJson),
+      );
+    } catch (_) {}
+    final existing = pages.indexWhere(
+      (p) =>
+          p.siteId == site.id &&
+          p.identityUrl == identity &&
+          p.collection == collection,
+    );
+    if (existing >= 0) {
+      pages.removeAt(existing);
+    } else {
+      pages.insert(
+        0,
+        SavedPage(
+          siteId: site.id,
+          url: url.toString(),
+          identityUrl: identity,
+          title: title.trim().isEmpty ? url.host : title.trim(),
+          posterUrl: posterUrl,
+          collection: collection,
+          savedAt: DateTime.now(),
+        ),
+      );
+    }
+    await _prefs.setString(
+      'saved_pages',
+      jsonEncode(pages.map((p) => p.toJson()).toList()),
+    );
+  }
+
+  Future<void> removeSavedPage(SavedPage entry) async {
+    final values = savedPages(entry.collection)
+        .where((p) => p != entry)
+        .toList();
+    final other = _allSavedPages().where(
+      (p) => p.collection != entry.collection,
+    );
+    await _prefs.setString(
+      'saved_pages',
+      jsonEncode([...values, ...other].map((p) => p.toJson()).toList()),
+    );
+  }
+
+  List<SavedPage> _allSavedPages() {
+    try {
+      return (jsonDecode(_prefs.getString('saved_pages') ?? '[]') as List)
+          .whereType<Map<String, dynamic>>()
+          .map(SavedPage.fromJson)
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
   static Future<SiteSettings> load() async =>
       SiteSettings(await SharedPreferences.getInstance());
 
@@ -72,6 +178,55 @@ class SiteSettings {
 
   Future<void> setEnabled(Site site, bool value) =>
       _prefs.setBool('rules_enabled_${site.id}', value);
+}
+
+String normalizeIdentityUrl(Uri url) => url
+    .replace(
+      scheme: url.scheme.toLowerCase(),
+      host: url.host.toLowerCase(),
+      fragment: '',
+    )
+    .toString();
+
+class SavedPage {
+  const SavedPage({
+    required this.siteId,
+    required this.url,
+    required this.identityUrl,
+    required this.title,
+    required this.collection,
+    required this.savedAt,
+    this.posterUrl,
+  });
+  final String siteId, url, identityUrl, title, collection;
+  final String? posterUrl;
+  final DateTime savedAt;
+  Map<String, Object?> toJson() => {
+    'siteId': siteId,
+    'url': url,
+    'identityUrl': identityUrl,
+    'title': title,
+    'posterUrl': posterUrl,
+    'collection': collection,
+    'savedAt': savedAt.toIso8601String(),
+  };
+  factory SavedPage.fromJson(Map<String, dynamic> json) => SavedPage(
+    siteId: json['siteId'] as String,
+    url: json['url'] as String,
+    identityUrl: json['identityUrl'] as String,
+    title: json['title'] as String,
+    posterUrl: json['posterUrl'] as String?,
+    collection: json['collection'] as String,
+    savedAt: DateTime.parse(json['savedAt'] as String),
+  );
+  @override
+  bool operator ==(Object other) =>
+      other is SavedPage &&
+      siteId == other.siteId &&
+      identityUrl == other.identityUrl &&
+      collection == other.collection;
+  @override
+  int get hashCode => Object.hash(siteId, identityUrl, collection);
 }
 
 class BrowseEntry {

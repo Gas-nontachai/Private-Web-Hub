@@ -96,6 +96,41 @@ __VISIBILITY__
         style.textContent = selectors.join(",\n") + " { display: none !important; }";
         (document.head || document.documentElement).appendChild(style);
         state.styles[key] = style;
+
+        const selector = selectors.join(",");
+        const hide = (element) => {
+          if (
+            element.style.getPropertyValue("display") !== "none" ||
+            element.style.getPropertyPriority("display") !== "important"
+          ) {
+            element.style.setProperty("display", "none", "important");
+          }
+        };
+        const hideSubtree = (element) => {
+          if (!element || element.nodeType !== 1) return;
+          if (element.matches(selector)) hide(element);
+          element.querySelectorAll(selector).forEach(hide);
+        };
+        document.querySelectorAll(selector).forEach(hide);
+        const observerKey = `${key}:hide`;
+        if (!state.observers[observerKey]) {
+          const observer = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+              if (mutation.type === "childList") {
+                mutation.addedNodes.forEach(hideSubtree);
+              } else {
+                hideSubtree(mutation.target);
+              }
+            }
+          });
+          observer.observe(document.documentElement || document, {
+            attributes: true,
+            attributeFilter: ["style", "class", "id"],
+            childList: true,
+            subtree: true,
+          });
+          state.observers[observerKey] = observer;
+        }
       } else if (action.type === "tapWhenVisible") {
         // Some players ignore synthetic clicks (isTrusted), so ask the host app for a real tap.
         const key = rule.id;

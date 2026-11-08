@@ -9,7 +9,12 @@
     "markHover": "#143B96",
     "muted": "#6D7F9F",
     "white": "#FFFFFF",
-    "border": "#1FFFFFFF"
+    "border": "#1FFFFFFF",
+    "appBackground": "#121212",
+    "appSurface": "#262626",
+    "appSurfaceActive": "#414141",
+    "appText": "#F2F2F2",
+    "appTextMuted": "#C6C6C6"
   },
   "fontFamily": "Kanit",
   "fonts": [
