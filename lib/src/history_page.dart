@@ -4,6 +4,27 @@ import 'browser_page.dart';
 import 'catalog.dart';
 import 'settings.dart';
 
+String _thaiDateTime(DateTime value) {
+  const months = [
+    'ม.ค.',
+    'ก.พ.',
+    'มี.ค.',
+    'เม.ย.',
+    'พ.ค.',
+    'มิ.ย.',
+    'ก.ค.',
+    'ส.ค.',
+    'ก.ย.',
+    'ต.ค.',
+    'พ.ย.',
+    'ธ.ค.',
+  ];
+  final local = value.toLocal();
+  final time =
+      '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+  return '$time ${local.day} ${months[local.month - 1]} ${local.year + 543}';
+}
+
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key, required this.catalog, required this.settings});
   final Catalog catalog;
@@ -69,7 +90,7 @@ class _HistoryPageState extends State<HistoryPage> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
-                    '${site?.name ?? uri?.host ?? ''} · ${entry.visitedAt.toLocal()}',
+                    '${site?.name ?? uri?.host ?? ''} · ${_thaiDateTime(entry.visitedAt)}',
                   ),
                   onTap: site == null || uri == null
                       ? null
