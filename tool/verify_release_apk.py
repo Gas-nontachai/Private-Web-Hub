@@ -13,7 +13,7 @@ def validate(apk_file, cert_file, signing_file, badging_file, version, build_num
 
     signing = Path(signing_file).read_text()
     certificates = re.findall(
-        r"Signer\s+#\d+\s+certificate\s+SHA-256\s+digest:\s*([0-9a-fA-F:]+)",
+        r"(?:V\d+(?:\.\d+)?\s+)?Signer(?::|\s+#\d+)?\s+certificate\s+SHA-256\s+digest:\s*([0-9a-fA-F:]+)",
         signing, flags=re.IGNORECASE,
     )
     if len(certificates) != 1:
