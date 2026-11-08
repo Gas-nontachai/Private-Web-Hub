@@ -12,6 +12,11 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "mv/app")
+            .setMethodCallHandler { call, result ->
+                if (call.method == "version") result.success(packageManager.getPackageInfo(packageName, 0).versionName)
+                else result.notImplemented()
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "mv/tap")
             .setMethodCallHandler { call, result ->
                 if (call.method != "tap") return@setMethodCallHandler result.notImplemented()

@@ -1,18 +1,107 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'browser_page.dart';
 import 'catalog.dart';
 import 'settings.dart';
 import 'settings_page.dart';
 import 'theme.dart';
+import 'history_page.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key, required this.catalog, required this.settings});
   final Catalog catalog;
   final SiteSettings settings;
 
   @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkUpdate());
+  }
+
+  Future<void> _checkUpdate() async {
+    try {
+      final installed = await const MethodChannel('mv/app')
+          .invokeMethod<String>('version');
+      final client = HttpClient();
+      final request = await client
+          .getUrl(
+            Uri.parse(
+              'https://api.github.com/repos/Gas-nontachai/Private-Web-Hub/releases/latest',
+            ),
+          )
+          .timeout(const Duration(seconds: 10));
+      request.headers.set('Accept', 'application/vnd.github+json');
+      final response = await (await request.close().timeout(
+        const Duration(seconds: 10),
+      )).transform(utf8.decoder).join();
+      client.close();
+      final release = jsonDecode(response) as Map<String, dynamic>;
+      final tag = release['tag_name'] as String? ?? '';
+      final match = RegExp(r'^v(\d+)\.(\d+)\.(\d+)$').firstMatch(tag);
+      final asset = (release['assets'] as List? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .where((a) => a['name'] == 'Movie.exe-$tag.apk')
+          .firstOrNull;
+      final installedMatch = RegExp(r'^(\d+)\.(\d+)\.(\d+)$')
+          .firstMatch(installed ?? '');
+      if (!mounted ||
+          match == null ||
+          installedMatch == null ||
+          asset == null) {
+        return;
+      }
+      final latest = List<int>.generate(3, (i) => int.parse(match[i + 1]!));
+      final current = List<int>.generate(
+        3,
+        (i) => int.parse(installedMatch[i + 1]!),
+      );
+      var comparison = 0;
+      for (var i = 0; i < 3 && comparison == 0; i++) {
+        comparison = latest[i].compareTo(current[i]);
+      }
+      if (comparison <= 0) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Update available'),
+          content: Text('Installed: $installed\nLatest: $tag'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Later'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                launchUrl(
+                  Uri.parse(asset['browser_download_url'] as String),
+                  mode: LaunchMode.externalApplication,
+                );
+              },
+              child: const Text('Download'),
+            ),
+          ],
+        ),
+      );
+    } catch (_) {
+      /* Update checks must not block app use. */
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final catalog = widget.catalog;
+    final settings = widget.settings;
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -46,6 +135,18 @@ class HomePage extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'History',
+                        icon: const Icon(Icons.history),
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => HistoryPage(
+                              catalog: catalog,
+                              settings: settings,
+                            ),
                           ),
                         ),
                       ),

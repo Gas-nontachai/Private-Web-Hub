@@ -14,10 +14,12 @@ class BrowserPage extends StatefulWidget {
     required this.site,
     required this.catalog,
     required this.settings,
+    this.initialUrl,
   });
   final Site site;
   final Catalog catalog;
   final SiteSettings settings;
+  final Uri? initialUrl;
 
   @override
   State<BrowserPage> createState() => _BrowserPageState();
@@ -136,7 +138,16 @@ class _BrowserPageState extends State<BrowserPage> {
                 children: [
                   InAppWebView(
                     initialUrlRequest: URLRequest(
-                      url: WebUri.uri(widget.site.url),
+                      url: WebUri.uri(
+                        widget.initialUrl != null &&
+                                decideNavigation(
+                                      widget.initialUrl!,
+                                      widget.catalog,
+                                    ) ==
+                                    NavDecision.allowInApp
+                            ? widget.initialUrl!
+                            : widget.site.url,
+                      ),
                     ),
                     initialUserScripts: UnmodifiableListView([script]),
                     initialSettings: InAppWebViewSettings(
@@ -173,7 +184,19 @@ class _BrowserPageState extends State<BrowserPage> {
                       await c.evaluateJavascript(source: script.source);
                       await _refreshNavState();
                     },
-                    onUpdateVisitedHistory: (c, url, _) => _refreshNavState(),
+                    onUpdateVisitedHistory: (c, url, _) async {
+                      await _refreshNavState();
+                      final uri = url?.uriValue;
+                      if (uri != null &&
+                          decideNavigation(uri, widget.catalog) ==
+                              NavDecision.allowInApp) {
+                        await widget.settings.recordVisit(
+                          widget.site,
+                          uri,
+                          await c.getTitle(),
+                        );
+                      }
+                    },
                     onReceivedError: (c, request, error) {
                       if (request.isForMainFrame ?? false) {
                         setState(() => _error = error.description);
