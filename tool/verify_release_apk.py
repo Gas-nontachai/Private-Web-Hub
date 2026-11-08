@@ -13,11 +13,15 @@ def validate(apk_file, cert_file, signing_file, badging_file, version, build_num
 
     signing = Path(signing_file).read_text()
     certificates = re.findall(
-        r"^Signer #\d+ certificate SHA-256 digest:\s*([0-9a-fA-F:]+)\s*$",
-        signing, flags=re.MULTILINE,
+        r"Signer\s+#\d+\s+certificate\s+SHA-256\s+digest:\s*([0-9a-fA-F:]+)",
+        signing, flags=re.IGNORECASE,
     )
     if len(certificates) != 1:
-        raise ValueError(f"Expected one APK signer, got {len(certificates)}. Check apksigner output.")
+        details = signing.strip() or "[empty]"
+        raise ValueError(
+            f"Expected one APK signer, got {len(certificates)}. "
+            f"Check apksigner output:\n{details}"
+        )
     expected = hashlib.sha256(Path(cert_file).read_bytes()).hexdigest().lower()
     actual = certificates[0].replace(":", "").lower()
     if actual != expected:
