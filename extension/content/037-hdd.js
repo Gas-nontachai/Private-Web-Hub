@@ -1,0 +1,100 @@
+(() => {
+  const playerHost = "playlist.streamhls1688.com";
+  const parentHost = "www.037-hdd.com";
+  const skipButtonSelector = "button#adgate-skip";
+  const clickedButtons = new WeakSet();
+
+  let parentUrl;
+  try {
+    parentUrl = new URL(document.referrer);
+  } catch {
+    return;
+  }
+
+  if (
+    location.hostname !== playerHost ||
+    !["http:", "https:"].includes(parentUrl.protocol) ||
+    parentUrl.hostname !== parentHost
+  ) {
+    return;
+  }
+
+  function isVisible(button) {
+    if (!button.isConnected || button.hasAttribute("hidden") || button.disabled) {
+      return false;
+    }
+
+    let element = button;
+    while (element) {
+      const style = window.getComputedStyle(element);
+      if (
+        style.display === "none" ||
+        style.visibility === "hidden" ||
+        style.visibility === "collapse" ||
+        Number.parseFloat(style.opacity) <= 0
+      ) {
+        return false;
+      }
+      element = element.parentElement;
+    }
+
+    return button.getClientRects().length > 0;
+  }
+
+  function resetDetachedButtons(node) {
+    if (!(node instanceof Element)) {
+      return;
+    }
+
+    if (node.matches(skipButtonSelector) && !node.isConnected) {
+      clickedButtons.delete(node);
+    }
+    for (const button of node.querySelectorAll(skipButtonSelector)) {
+      if (!button.isConnected) {
+        clickedButtons.delete(button);
+      }
+    }
+  }
+
+  function checkSkipButtons() {
+    for (const button of document.querySelectorAll(skipButtonSelector)) {
+      if (!isVisible(button)) {
+        clickedButtons.delete(button);
+        continue;
+      }
+
+      if (!clickedButtons.has(button)) {
+        clickedButtons.add(button);
+        button.click();
+      }
+    }
+  }
+
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (
+        mutation.type === "attributes" &&
+        mutation.attributeName === "hidden" &&
+        mutation.target instanceof Element &&
+        mutation.target.matches(skipButtonSelector) &&
+        (mutation.oldValue !== null || mutation.target.hasAttribute("hidden"))
+      ) {
+        clickedButtons.delete(mutation.target);
+      }
+
+      for (const removedNode of mutation.removedNodes) {
+        resetDetachedButtons(removedNode);
+      }
+    }
+    checkSkipButtons();
+  });
+
+  observer.observe(document, {
+    attributes: true,
+    attributeOldValue: true,
+    childList: true,
+    subtree: true
+  });
+
+  checkSkipButtons();
+})();

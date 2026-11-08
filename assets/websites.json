@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "version": "2026.11.08",
+  "sites": [
+    {
+      "id": "serieday",
+      "name": "SerieDay",
+      "mark": "SD",
+      "url": "https://www.serieday-z.com/",
+      "hosts": [
+        "www.serieday-z.com"
+      ],
+      "enabled": true,
+      "rules": [
+        {
+          "id": "serieday-hide-ads",
+          "hosts": [
+            "www.serieday-z.com"
+          ],
+          "enabled": true,
+          "actions": [
+            {
+              "type": "hide",
+              "selectors": [
+                ".adhl",
+                ".adb",
+                ".ad",
+                ".adl"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "037hdd",
+      "name": "037HDD",
+      "mark": "037",
+      "url": "https://www.037-hdd.com/",
+      "hosts": [
+        "www.037-hdd.com"
+      ],
+      "enabled": true,
+      "rules": [
+        {
+          "id": "037hdd-hide-ads",
+          "hosts": [
+            "www.037-hdd.com"
+          ],
+          "enabled": true,
+          "actions": [
+            {
+              "type": "hide",
+              "selectors": [
+                "#ads-popup",
+                "#ads-single",
+                "#ads",
+                "[id^=\"ads-\"]"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "goseries4k",
+      "name": "GoSeries4K",
+      "mark": "G4K",
+      "url": "https://www.goseries4k.com/",
+      "hosts": [
+        "goseries4k.com",
+        "www.goseries4k.com"
+      ],
+      "enabled": true,
+      "rules": [
+        {
+          "id": "goseries4k-hide-ads",
+          "hosts": [
+            "goseries4k.com",
+            "www.goseries4k.com"
+          ],
+          "enabled": true,
+          "actions": [
+            {
+              "type": "hide",
+              "selectors": [
+                "[class^=\"vipx-\"]",
+                "[class*=\" vipx-\"]"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "globalRules": [
+    {
+      "id": "global-adgate-skip",
+      "hosts": [
+        "*"
+      ],
+      "enabled": true,
+      "actions": [
+        {
+          "type": "tapWhenVisible",
+          "selectors": [
+            "button#adgate-skip"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+
+{
+  "manifest_version": 3,
+  "name": "Movie.exe",
+  "version": "1.0.0",
+  "description": "Hide advertisements on supported websites",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup/index.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.serieday-z.com/*",
+        "http://www.serieday-z.com/*"
+      ],
+      "css": ["rules/serieday.css"],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://www.037-hdd.com/*",
+        "http://www.037-hdd.com/*"
+      ],
+      "css": ["rules/037-hdd.css"],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://goseries4k.com/*",
+        "http://goseries4k.com/*",
+        "https://www.goseries4k.com/*",
+        "http://www.goseries4k.com/*"
+      ],
+      "css": ["rules/goseries4k.css"],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://*/*",
+        "http://*/*"
+      ],
+      "js": ["content/adgate-skip-global.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ]
+}

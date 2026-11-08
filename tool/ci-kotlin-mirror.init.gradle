@@ -1,0 +1,13 @@
+// CI-only Gradle init script: prefer a Kotlin Maven mirror for plugin
+// resolution in all builds, including Flutter's included Gradle plugin build.
+def kotlinMirror = 'https://maven.aliyun.com/repository/public'
+
+gradle.beforeSettings { settings ->
+    settings.pluginManagement.repositories {
+        maven {
+            name = 'MovieExeKotlinMirror'
+            url = uri(kotlinMirror)
+            content { includeGroup('org.jetbrains.kotlin') }
+        }
+    }
+}

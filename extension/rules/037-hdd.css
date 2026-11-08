@@ -1,0 +1,6 @@
+#ads-popup,
+#ads-single,
+#ads,
+[id^="ads-"] {
+  display: none !important;
+}
