@@ -25,7 +25,6 @@ class _SearchPageState extends State<SearchPage> {
       .where((site) => site.search != null)
       .toList();
   late final Set<String> _selectedSites = _sites.map((site) => site.id).toSet();
-  final Set<String> _visitedSites = {};
   late final Map<String, BrowserLoadState> _states = {
     for (final site in _sites) site.id: BrowserLoadState.loading,
   };
@@ -100,35 +99,18 @@ class _SearchPageState extends State<SearchPage> {
                     animation: tabs,
                     builder: (context, _) {
                       final activeSite = sites[tabs.index];
-                      _visitedSites.add(activeSite.id);
-                      return IndexedStack(
-                        index: tabs.index,
-                        children: [
-                          for (var i = 0; i < sites.length; i++)
-                            if (_visitedSites.contains(sites[i].id))
-                              BrowserPage(
-                                key: ValueKey(sites[i].id),
-                                site: sites[i],
-                                catalog: widget.catalog,
-                                settings: widget.settings,
-                                initialUrl: buildSearchUri(
-                                  sites[i],
-                                  widget.query,
-                                ),
-                                handleSystemBack: i == tabs.index,
-                                loadTimeout: const Duration(seconds: 12),
-                                onLoadStateChanged: (state) {
-                                  if (_states[sites[i].id] != state &&
-                                      mounted) {
-                                    setState(
-                                      () => _states[sites[i].id] = state,
-                                    );
-                                  }
-                                },
-                              )
-                            else
-                              const SizedBox.expand(),
-                        ],
+                      return BrowserPage(
+                        key: ValueKey(activeSite.id),
+                        site: activeSite,
+                        catalog: widget.catalog,
+                        settings: widget.settings,
+                        initialUrl: buildSearchUri(activeSite, widget.query),
+                        loadTimeout: const Duration(seconds: 12),
+                        onLoadStateChanged: (state) {
+                          if (_states[activeSite.id] != state && mounted) {
+                            setState(() => _states[activeSite.id] = state);
+                          }
+                        },
                       );
                     },
                   ),

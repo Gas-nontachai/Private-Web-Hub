@@ -211,6 +211,7 @@ class _HomePageState extends State<HomePage> {
                           child: Image.memory(
                             icon,
                             fit: BoxFit.contain,
+                            cacheWidth: 256,
                             errorBuilder: (_, _, _) => _siteMark(site.mark),
                           ),
                         )
