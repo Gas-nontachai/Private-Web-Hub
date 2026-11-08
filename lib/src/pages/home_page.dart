@@ -42,13 +42,13 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final pages = [
       _explore(),
-      HistoryPage(
+      LibraryPage(
         catalog: widget.catalog,
         settings: widget.settings,
         embedded: true,
         query: _queries[1],
       ),
-      LibraryPage(
+      HistoryPage(
         catalog: widget.catalog,
         settings: widget.settings,
         embedded: true,
@@ -65,8 +65,8 @@ class _HomePageState extends State<HomePage> {
             hintText: _tab == 0
                 ? 'ค้นหาหนังและซีรีส์'
                 : _tab == 1
-                ? 'ค้นหาในประวัติ'
-                : 'ค้นหาในรายการบันทึก',
+                ? 'ค้นหาในรายการบันทึก'
+                : 'ค้นหาในประวัติ',
             prefixIcon: IconButton(
               tooltip: 'ค้นหาจากเว็บไซต์',
               icon: const Icon(Icons.search),
@@ -123,7 +123,7 @@ class _HomePageState extends State<HomePage> {
               }
             },
             itemBuilder: (_) => [
-              if (_tab == 1 && widget.settings.history.isNotEmpty)
+              if (_tab == 2 && widget.settings.history.isNotEmpty)
                 const PopupMenuItem(
                   value: 'clear-history',
                   child: Text('ล้างประวัติ'),
