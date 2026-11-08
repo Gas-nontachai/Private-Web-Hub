@@ -1,325 +1,177 @@
-name: Release
+name: Android APK + Extension Release
 
 on:
   push:
-    tags: ["v*.*.*"]
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing release tag (vX.Y.Z)"
+        description: Existing tag (vX.Y.Z)
         required: true
         type: string
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
-defaults:
-  run:
-    shell: bash
-
 jobs:
-  version:
-    runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ steps.version.outputs.tag }}
-      version: ${{ steps.version.outputs.version }}
-      build_number: ${{ steps.version.outputs.build_number }}
-      sha: ${{ steps.version.outputs.sha }}
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Validate release version and tag
+      - name: Validate existing tag and release metadata
         id: version
         env:
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           version=$(python3 tool/release_extension.py version "$RELEASE_TAG")
           build_number=$(python3 tool/release_extension.py android-code "$RELEASE_TAG")
-          sha=$(git rev-parse --verify "refs/tags/${RELEASE_TAG}^{commit}")
+          git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"
+          tag_sha=$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")
+          git merge-base --is-ancestor "$tag_sha" origin/main
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "::error::Release $RELEASE_TAG already exists."
+            exit 1
+          fi
           {
             echo "tag=$RELEASE_TAG"
             echo "version=$version"
             echo "build_number=$build_number"
-            echo "sha=$sha"
+            echo "sha=$tag_sha"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Refuse an existing release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          response=$(mktemp)
-          trap 'rm -f "$response"' EXIT
-          if gh api --include "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$response"; then
-            echo "::error::Release $RELEASE_TAG already exists; refusing to overwrite it."
-            exit 1
-          elif ! grep -Eq '^HTTP/[^ ]+ 404' "$response"; then
-            echo "::error::Could not check whether the release exists."
-            exit 1
-          fi
-
-  apk:
-    needs: version
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.version.outputs.sha }}
-          persist-credentials: false
+      - name: Check out tagged release source
+        run: git checkout --detach "${{ steps.version.outputs.sha }}"
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: '17'
 
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.47.6'
           channel: stable
           cache: true
 
-      - run: flutter pub get
-      - run: flutter analyze
-      - run: flutter test
+      - name: Install dependencies and run Flutter checks
+        run: |
+          flutter pub get --enforce-lockfile
+          flutter analyze
+          flutter test
 
-      - name: Configure existing release signing
+      - name: Test Chrome extension packaging
+        run: |
+          python3 -m json.tool extension/manifest.json >/dev/null
+          python3 -m unittest discover -s tool -p 'test_*extension*.py'
+
+      - name: Restore signing keystore
         env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/android-release.jks
         run: |
           set -euo pipefail
-          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$STORE_PASSWORD" ] || \
-             [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
-            echo "::error::All four Android signing secrets are required."
-            exit 1
-          fi
-          umask 077
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
           python3 - <<'PY'
+          import base64
+          import binascii
           import os
-          import struct
           from pathlib import Path
-
-          def escape(value):
-              encoded = value.encode("utf-16-be")
-              return "".join(
-                  "\\" + char if char in "\\ =:#!"
-                  else f"\\u{ord(char):04x}" if ord(char) < 32 or ord(char) > 126
-                  else char for char in map(chr, struct.unpack(f">{len(encoded) // 2}H", encoded))
-              )
-
-          values = {
-              "storeFile": "app/release.keystore",
-              "storePassword": os.environ["STORE_PASSWORD"],
-              "keyAlias": os.environ["KEY_ALIAS"],
-              "keyPassword": os.environ["KEY_PASSWORD"],
-          }
-          Path("android/key.properties").write_text(
-              "".join(f"{key}={escape(value)}\n" for key, value in values.items())
-          )
+          required = ("ANDROID_KEYSTORE_BASE64", "ANDROID_KEYSTORE_PASSWORD",
+                      "ANDROID_KEY_ALIAS", "ANDROID_KEY_PASSWORD", "ANDROID_KEYSTORE_PATH")
+          missing = [key for key in required if not os.environ.get(key)]
+          if missing:
+              raise SystemExit("Missing signing secrets: " + ", ".join(missing))
+          try:
+              data = base64.b64decode("".join(os.environ["ANDROID_KEYSTORE_BASE64"].split()), validate=True)
+          except (ValueError, binascii.Error):
+              raise SystemExit("Invalid ANDROID_KEYSTORE_BASE64") from None
+          if not data:
+              raise SystemExit("Empty release keystore")
+          path = Path(os.environ["ANDROID_KEYSTORE_PATH"])
+          with path.open("xb") as file:
+              path.chmod(0o600)
+              file.write(data)
           PY
-          keytool -exportcert -keystore android/app/release.keystore \
-            -storepass:env STORE_PASSWORD -alias "$KEY_ALIAS" \
-            -file "$RUNNER_TEMP/android-signing-cert.der"
 
-      - name: Cache Gradle distributions and dependencies
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Configure Kotlin Maven mirror for Flutter included builds
-        run: |
-          set -euo pipefail
-          mkdir -p "${GRADLE_USER_HOME:-$HOME/.gradle}/init.d"
-          cp tool/ci-kotlin-mirror.init.gradle \
-            "${GRADLE_USER_HOME:-$HOME/.gradle}/init.d/00-movieexe-kotlin-mirror.init.gradle"
-          echo "Gradle Kotlin repository mirror configured for root and included builds."
-
-      - name: Prepare Gradle wrapper
-        run: |
-          set -euo pipefail
-          flutter build apk --release --config-only
-          for attempt in 1 2 3; do
-            if android/gradlew --version; then
-              exit 0
-            fi
-            if [ "$attempt" -eq 3 ]; then
-              echo "::error::Gradle wrapper download failed after 3 attempts."
-              exit 1
-            fi
-            delay=$((attempt * 20))
-            echo "::warning::Gradle download failed (attempt $attempt of 3); retrying in ${delay}s."
-            sleep "$delay"
-          done
-
-      - name: Build universal release APK
+      - name: Build signed universal APK
         env:
-          RELEASE_VERSION: ${{ needs.version.outputs.version }}
-          RELEASE_BUILD_NUMBER: ${{ needs.version.outputs.build_number }}
-        run: |
-          set -euo pipefail
-          build_log=$(mktemp)
-          trap 'rm -f "$build_log"' EXIT
-          for attempt in 1 2 3; do
-            if flutter build apk --release --build-name="$RELEASE_VERSION" --build-number="$RELEASE_BUILD_NUMBER" 2>&1 | tee "$build_log"; then
-              exit 0
-            else
-              status=${PIPESTATUS[0]}
-            fi
-            if ! grep -Fq '[!] Gradle threw an error while downloading artifacts from the network.' "$build_log"; then
-              exit "$status"
-            fi
-            if [ "$attempt" -eq 3 ]; then
-              echo "::error::Gradle artifact download failed after 3 build attempts."
-              exit "$status"
-            fi
-            delay=$((attempt * 15))
-            echo "::warning::Gradle artifact download failed (attempt $attempt of 3); retrying in ${delay}s."
-            sleep "$delay"
-          done
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/android-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_BUILD_NUMBER: ${{ steps.version.outputs.build_number }}
+        run: flutter build apk --release --build-name="$RELEASE_VERSION" --build-number="$RELEASE_BUILD_NUMBER"
 
-      - name: Verify universal APK, signing identity and display name
+      - name: Verify signed APK
         env:
-          RELEASE_TAG: ${{ needs.version.outputs.tag }}
-          RELEASE_VERSION: ${{ needs.version.outputs.version }}
-          RELEASE_BUILD_NUMBER: ${{ needs.version.outputs.build_number }}
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/android-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_BUILD_NUMBER: ${{ steps.version.outputs.build_number }}
         run: |
           set -euo pipefail
           apk=build/app/outputs/flutter-apk/app-release.apk
-          if [ ! -s "$apk" ]; then
-            echo "::error::Flutter did not produce a nonempty universal APK at $apk"
-            exit 1
-          fi
-          tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
-          "$tools/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/apk-signing.txt"
-          "$tools/aapt" dump badging "$apk" > "$RUNNER_TEMP/apk-badging.txt"
+          test -s "$apk"
+          build_tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
+          "$build_tools/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/apk-signing.txt"
+          "$build_tools/aapt" dump badging "$apk" > "$RUNNER_TEMP/apk-badging.txt"
+          keytool -exportcert -keystore "$ANDROID_KEYSTORE_PATH" \
+            -storepass:env ANDROID_KEYSTORE_PASSWORD -alias "$ANDROID_KEY_ALIAS" \
+            -file "$RUNNER_TEMP/android-signing-cert.der"
           python3 tool/verify_release_apk.py "$apk" \
             "$RUNNER_TEMP/android-signing-cert.der" \
-            "$RUNNER_TEMP/apk-signing.txt" \
-            "$RUNNER_TEMP/apk-badging.txt" \
+            "$RUNNER_TEMP/apk-signing.txt" "$RUNNER_TEMP/apk-badging.txt" \
             "$RELEASE_VERSION" "$RELEASE_BUILD_NUMBER"
-          mkdir -p dist
-          cp "$apk" "dist/Movie.exe-$RELEASE_TAG.apk"
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: apk
-          path: dist/Movie.exe-${{ needs.version.outputs.tag }}.apk
-          if-no-files-found: error
+      - name: Package APK and Chrome extension
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/Movie.exe-$RELEASE_TAG.apk"
+          python3 tool/package_extension_zip.py extension "$RELEASE_TAG" "dist/Movie.exe-$RELEASE_TAG.zip"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import zipfile
+          tag = os.environ["RELEASE_TAG"]
+          files = list(Path("dist").iterdir())
+          expected = {f"Movie.exe-{tag}.apk", f"Movie.exe-{tag}.zip"}
+          assert {item.name for item in files} == expected
+          assert all(item.is_file() and item.stat().st_size for item in files)
+          with zipfile.ZipFile(f"dist/Movie.exe-{tag}.zip") as archive:
+              assert archive.testzip() is None
+              assert "manifest.json" in archive.namelist()
+          PY
 
       - name: Remove signing material
         if: always()
-        run: |
-          rm -f android/key.properties android/app/release.keystore \
-            "$RUNNER_TEMP/android-signing-cert.der"
+        run: rm -f "$RUNNER_TEMP/android-release.jks" "$RUNNER_TEMP/android-signing-cert.der"
 
-  extension:
-    needs: version
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.version.outputs.sha }}
-          persist-credentials: false
-
-      - name: Validate bundled extension source
-        run: |
-          test -s extension/manifest.json
-          python3 -m json.tool extension/manifest.json > /dev/null
-
-      - name: Test extension packaging
-        run: python3 -m unittest discover -s tool -p 'test_*extension*.py'
-
-      - name: Package Chrome extension for Load unpacked
-        env:
-          RELEASE_TAG: ${{ needs.version.outputs.tag }}
-        run: |
-          set -euo pipefail
-          python3 tool/package_extension_zip.py extension "$RELEASE_TAG" \
-            "dist/Movie.exe-$RELEASE_TAG.zip"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: extension
-          path: dist/Movie.exe-${{ needs.version.outputs.tag }}.zip
-          if-no-files-found: error
-
-  release:
-    needs: [version, apk, extension]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.version.outputs.sha }}
-          persist-credentials: false
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: apk
-          path: dist
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: extension
-          path: dist
-
-      - name: Validate exact release outputs
-        env:
-          RELEASE_TAG: ${{ needs.version.outputs.tag }}
-        run: |
-          python3 - <<'PY'
-          import os
-          from pathlib import Path
-
-          tag = os.environ["RELEASE_TAG"]
-          expected = {f"Movie.exe-{tag}.apk", f"Movie.exe-{tag}.zip"}
-          files = list(Path("dist").iterdir())
-          if {file.name for file in files} != expected or any(
-              not file.is_file() or file.stat().st_size == 0 for file in files
-          ):
-              raise ValueError("Release must contain exactly one nonempty APK and one nonempty extension ZIP")
-          PY
-          python3 - "$RELEASE_TAG" <<'PY'
-          import json
-          import os
-          import sys
-          import zipfile
-          with zipfile.ZipFile(f"dist/Movie.exe-{sys.argv[1]}.zip") as archive:
-              assert archive.testzip() is None
-              manifest = json.loads(archive.read("manifest.json"))
-              assert manifest["name"] == "Movie.exe"
-              assert manifest["version"] == sys.argv[1][1:]
-          PY
-
-      - name: Publish GitHub Release only after both assets are uploaded
+      - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ needs.version.outputs.tag }}
-          RELEASE_SHA: ${{ needs.version.outputs.sha }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: |
           set -euo pipefail
-          printf 'Version: %s\nAndroid commit: %s\n' "$RELEASE_TAG" "$RELEASE_SHA" > "$RUNNER_TEMP/release-notes.txt"
-          gh release create "$RELEASE_TAG" --verify-tag --draft \
-            --title "Movie.exe $RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.txt" \
-            "dist/Movie.exe-$RELEASE_TAG.apk" "dist/Movie.exe-$RELEASE_TAG.zip"
-          gh release view "$RELEASE_TAG" --json assets > "$RUNNER_TEMP/release-assets.json"
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          assets = json.loads(Path(os.environ["RUNNER_TEMP"], "release-assets.json").read_text())["assets"]
-          tag = os.environ["RELEASE_TAG"]
-          expected = {f"Movie.exe-{tag}.apk", f"Movie.exe-{tag}.zip"}
-          if len(assets) != 2 or {asset["name"] for asset in assets} != expected:
-              raise ValueError("Uploaded release assets do not match the required APK + ZIP")
-          PY
-          gh release edit "$RELEASE_TAG" --draft=false
+          gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f "tag_name=$RELEASE_TAG" --jq '.body' > "$RUNNER_TEMP/release-notes.md"
+          gh release create "$RELEASE_TAG" dist/*.apk dist/*.zip \
+            --verify-tag --title "Movie.exe $RELEASE_TAG" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
