@@ -148,12 +148,12 @@ class _HomePageState extends State<HomePage> {
             selectedIcon: Icon(Icons.explore),
             label: 'Explore',
           ),
-          NavigationDestination(icon: Icon(Icons.history), label: 'History'),
           NavigationDestination(
             icon: Icon(Icons.favorite_border),
             selectedIcon: Icon(Icons.favorite),
             label: 'Favorites',
           ),
+          NavigationDestination(icon: Icon(Icons.history), label: 'History'),
         ],
       ),
     );

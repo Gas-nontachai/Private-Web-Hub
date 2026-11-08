@@ -78,3 +78,64 @@ test('Android tap action sends visible button coordinates to native handler', ()
   timer();
   assert.equal(calls.length,1);
 });
+
+test('Android hide rule defeats inline important display and re-hides reinjected ads', () => {
+  const sideAd = (id) => {
+    const values = new Map([['display', 'block']]);
+    const priorities = new Map([['display', 'important']]);
+    return {
+      nodeType: 1,
+      id,
+      style: {
+        getPropertyValue: (name) => values.get(name) || '',
+        getPropertyPriority: (name) => priorities.get(name) || '',
+        setProperty: (name, value, priority = '') => {
+          values.set(name, value);
+          priorities.set(name, priority);
+        },
+      },
+      matches: (selector) => selector.split(',').map((s) => s.trim()).includes(`#${id}`),
+      querySelectorAll: () => [],
+    };
+  };
+  const original = sideAd('box-side-r');
+  let nodes = [original];
+  let observerCallback;
+  const documentElement = {appendChild() {}};
+  const context = {
+    URL,
+    location: {hostname: 'animeruka.com'},
+    window: {__mvRules: undefined, addEventListener() {}},
+    document: {
+      referrer: '',
+      documentElement,
+      head: {appendChild() {}},
+      createDocumentFragment: () => ({querySelector: () => null}),
+      createElement: () => ({dataset: {}, isConnected: true}),
+      querySelectorAll: (selector) => nodes.filter((node) => node.matches(selector)),
+    },
+    MutationObserver: class {
+      constructor(callback) { observerCallback = callback; }
+      observe() {}
+    },
+  };
+  const rules = [{
+    id: 'animeruka-hide-ads', hosts: ['animeruka.com'],
+    actions: [{type: 'hide', selectors: ['#box-side-l', '#box-side-r']}],
+  }];
+  vm.runInNewContext(
+    read('assets/runtime/rule_runtime.js').replace('__RULES__', JSON.stringify(rules)),
+    context,
+  );
+  assert.equal(original.style.getPropertyValue('display'), 'none');
+  assert.equal(original.style.getPropertyPriority('display'), 'important');
+
+  original.style.setProperty('display', 'block', 'important');
+  observerCallback([{type: 'attributes', attributeName: 'style', target: original}]);
+  assert.equal(original.style.getPropertyValue('display'), 'none');
+
+  const reinjected = sideAd('box-side-l');
+  nodes = [original, reinjected];
+  observerCallback([{type: 'childList', addedNodes: [reinjected]}]);
+  assert.equal(reinjected.style.getPropertyValue('display'), 'none');
+});
