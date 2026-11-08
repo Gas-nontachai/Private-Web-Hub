@@ -23,6 +23,20 @@ uploaded. GitHub's automatically generated source archives are platform-provided
 links, not uploaded release assets. Nothing is published to Google Play or the
 Chrome Web Store.
 
+Release notes are generated from [.github/release-template.md](.github/release-template.md)
+by [tool/generate_release_notes.py](tool/generate_release_notes.py). Preview notes
+without building the app:
+
+```sh
+python3 tool/generate_release_notes.py v1.0.0 --output release-notes.md
+```
+
+To update notes for an existing release without rebuilding or changing its assets:
+
+```sh
+gh release edit v1.0.0 --notes-file release-notes.md
+```
+
 Commit and push the pipeline changes first, then push a new tag:
 
 ```sh
