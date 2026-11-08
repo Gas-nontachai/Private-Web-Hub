@@ -51,6 +51,7 @@ class Site {
     required this.hosts,
     required this.enabled,
     required this.rules,
+    this.search,
   });
   final String id;
   final String name;
@@ -59,16 +60,25 @@ class Site {
   final List<String> hosts;
   final bool enabled;
   final List<Rule> rules;
+  final SiteSearch? search;
 }
 
-/// Builds the site search URL for providers that expose a query parameter.
+class SiteSearch {
+  const SiteSearch({required this.path, required this.queryKey});
+  final String path;
+  final String queryKey;
+}
+
+/// Builds a site's configured search URL with URI-safe query encoding.
 Uri buildSearchUri(Site site, String query) {
-  if (site.id == 'animeruka') {
-    return Uri.parse(
-      '${site.url.origin}/?s=${Uri.encodeComponent(query)}',
-    );
+  final search = site.search;
+  if (search == null) {
+    throw ArgumentError.value(site.id, 'site', 'No search URL configured');
   }
-  throw ArgumentError.value(site.id, 'site', 'No search URL configured');
+  return site.url.replace(
+    path: search.path,
+    queryParameters: {search.queryKey: query},
+  );
 }
 
 class Catalog {
@@ -87,8 +97,9 @@ class Catalog {
 
   bool isAllowedHost(String host) => allowedHosts.contains(host.toLowerCase());
 
-  static Future<Catalog> load([String path = 'assets/catalog/websites.json']) async =>
-      Catalog.parse(await rootBundle.loadString(path));
+  static Future<Catalog> load([
+    String path = 'assets/catalog/websites.json',
+  ]) async => Catalog.parse(await rootBundle.loadString(path));
 
   static Catalog parse(String source) {
     final Object? root;
@@ -128,6 +139,8 @@ class Catalog {
       throw CatalogException('Site hosts must include ${url.host}');
     }
     final rules = [for (final r in _list(j, 'rules')) _rule(_map(r), hosts)];
+    final searchJson = j['search'];
+    final search = searchJson == null ? null : _search(_map(searchJson));
     return Site(
       id: _str(j, 'id'),
       name: _str(j, 'name'),
@@ -136,7 +149,16 @@ class Catalog {
       hosts: hosts,
       enabled: j['enabled'] != false,
       rules: rules,
+      search: search,
     );
+  }
+
+  static SiteSearch _search(Map<String, dynamic> json) {
+    final path = _str(json, 'path');
+    if (!path.startsWith('/') || path.startsWith('//')) {
+      throw CatalogException('Search path must be site-relative');
+    }
+    return SiteSearch(path: path, queryKey: _str(json, 'queryKey'));
   }
 
   static Rule _rule(Map<String, dynamic> j, List<String>? siteHosts) {

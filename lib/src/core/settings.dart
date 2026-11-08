@@ -84,8 +84,9 @@ class SiteSettings {
     Site site,
     Uri url,
     String title,
-    String collection,
-  ) async {
+    String collection, {
+    String? posterUrl,
+  }) async {
     final identity = normalizeIdentityUrl(url);
     final pages = <SavedPage>[];
     try {
@@ -111,6 +112,7 @@ class SiteSettings {
           url: url.toString(),
           identityUrl: identity,
           title: title.trim().isEmpty ? url.host : title.trim(),
+          posterUrl: posterUrl,
           collection: collection,
           savedAt: DateTime.now(),
         ),
@@ -177,14 +179,17 @@ class SavedPage {
     required this.title,
     required this.collection,
     required this.savedAt,
+    this.posterUrl,
   });
   final String siteId, url, identityUrl, title, collection;
+  final String? posterUrl;
   final DateTime savedAt;
-  Map<String, Object> toJson() => {
+  Map<String, Object?> toJson() => {
     'siteId': siteId,
     'url': url,
     'identityUrl': identityUrl,
     'title': title,
+    'posterUrl': posterUrl,
     'collection': collection,
     'savedAt': savedAt.toIso8601String(),
   };
@@ -193,6 +198,7 @@ class SavedPage {
     url: json['url'] as String,
     identityUrl: json['identityUrl'] as String,
     title: json['title'] as String,
+    posterUrl: json['posterUrl'] as String?,
     collection: json['collection'] as String,
     savedAt: DateTime.parse(json['savedAt'] as String),
   );

@@ -100,14 +100,16 @@ class _HistoryPageState extends State<HistoryPage> {
           ),
         Expanded(
           child: history.isEmpty
-              ? const Center(
+              ? Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.history, size: 76, color: Colors.white70),
                       SizedBox(height: 20),
                       Text(
-                        'ยังไม่มีประวัติ',
+                        query.trim().isEmpty
+                            ? 'ยังไม่มีประวัติ'
+                            : 'ไม่พบประวัติที่ตรงกัน',
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
@@ -116,7 +118,9 @@ class _HistoryPageState extends State<HistoryPage> {
                       ),
                       SizedBox(height: 10),
                       Text(
-                        'หน้าเว็บที่เปิดจะปรากฏที่นี่',
+                        query.trim().isEmpty
+                            ? 'หน้าเว็บที่เปิดจะปรากฏที่นี่'
+                            : 'แตะแว่นขยายเพื่อค้นหาจากเว็บไซต์',
                         textAlign: TextAlign.center,
                       ),
                     ],

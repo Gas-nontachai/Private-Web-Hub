@@ -57,6 +57,11 @@ void main() {
       Uri.parse('HTTPS://EXAMPLE.COM/page#one'),
       'Page',
       'favorite',
+      posterUrl: 'https://images.example/poster.jpg',
+    );
+    expect(
+      settings.savedPages('favorite').single.posterUrl,
+      'https://images.example/poster.jpg',
     );
     await settings.toggleSavedPage(
       site,

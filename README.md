@@ -7,6 +7,9 @@ same declarative ad-hiding rules as the bundled [Chrome extension](extension/).
 - Runtime: `assets/runtime/rule_runtime.js` (bundled, idempotent; no remote code execution).
 - Generate shared assets: `python3 tool/generate_shared.py`; verify them: `python3 tool/generate_shared.py --check`
 - Settings: per-site rule toggles, clear browsing data, rule version.
+- Search: Explore opens configured site search pages in parallel WebViews. Each tab shows its own load state and keeps the existing host rules. Site search URL patterns live in the optional `search` catalog field; adding one requires a same-site path and query key.
+
+Search currently displays each website's own results page in a source tab. It does not extract and merge poster/title cards into a native result list.
 
 ## Project structure
 

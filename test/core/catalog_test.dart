@@ -10,25 +10,57 @@ void main() {
   test('bundled catalog has the configured sites once', () {
     final c = Catalog.parse(source);
     expect(c.sites.map((s) => s.name), [
-      'SerieDay', '037HDD', 'GoSeries4K', 'AnimeRuka',
+      'SerieDay',
+      '037HDD',
+      'GoSeries4K',
+      'AnimeRuka',
     ]);
     expect(c.sites.map((s) => s.id).toSet().length, c.sites.length);
     expect(c.sites.every((s) => s.url.scheme == 'https'), isTrue);
   });
 
-  test('AnimeRuka search URL encodes Thai text and spaces', () {
+  test('configured search URLs encode Thai text and reserved characters', () {
     final c = Catalog.parse(source);
-    final site = c.sites.singleWhere((s) => s.id == 'animeruka');
-    expect(site.url.toString(), 'https://animeruka.com/');
+    final site = c.sites.singleWhere((s) => s.id == 'serieday');
     expect(
-      buildSearchUri(site, 'รักนะ 2026').toString(),
-      'https://animeruka.com/?s=%E0%B8%A3%E0%B8%B1%E0%B8%81%E0%B8%99%E0%B8%B0%202026',
+      buildSearchUri(site, 'รักนะ & 2026').toString(),
+      'https://www.serieday-z.com/search_movie/?keyword=%E0%B8%A3%E0%B8%B1%E0%B8%81%E0%B8%99%E0%B8%B0+%26+2026',
     );
     expect(
-      site.rules.single.actions.single.selectors,
+      buildSearchUri(
+        c.sites.singleWhere((s) => s.id == '037hdd'),
+        'a+b',
+      ).toString(),
+      'https://www.037-hdd.com/?s=a%2Bb',
+    );
+    expect(
+      buildSearchUri(
+        c.sites.singleWhere((s) => s.id == 'goseries4k'),
+        'test',
+      ).toString(),
+      'https://www.goseries4k.com/?s=test',
+    );
+    expect(
+      buildSearchUri(
+        c.sites.singleWhere((s) => s.id == 'animeruka'),
+        'รัก & a+b',
+      ).toString(),
+      'https://animeruka.com/?s=%E0%B8%A3%E0%B8%B1%E0%B8%81+%26+a%2Bb',
+    );
+    expect(
+      c.sites
+          .singleWhere((s) => s.id == 'animeruka')
+          .rules
+          .single
+          .actions
+          .single
+          .selectors,
       [
-        '#box-side-r', '#box-side-l', '[id^="ad-group-"]',
-        '#box-footer-fix', '.ar-adgrid',
+        '#box-side-r',
+        '#box-side-l',
+        '[id^="ad-group-"]',
+        '#box-footer-fix',
+        '.ar-adgrid',
       ],
     );
   });

@@ -10,6 +10,7 @@
       "hosts": [
         "www.serieday-z.com"
       ],
+      "search": { "path": "/search_movie/", "queryKey": "keyword" },
       "enabled": true,
       "rules": [
         {
@@ -40,6 +41,7 @@
       "hosts": [
         "www.037-hdd.com"
       ],
+      "search": { "path": "/", "queryKey": "s" },
       "enabled": true,
       "rules": [
         {
@@ -71,6 +73,7 @@
         "goseries4k.com",
         "www.goseries4k.com"
       ],
+      "search": { "path": "/", "queryKey": "s" },
       "enabled": true,
       "rules": [
         {
@@ -100,6 +103,7 @@
       "hosts": [
         "animeruka.com"
       ],
+      "search": { "path": "/", "queryKey": "s" },
       "enabled": true,
       "rules": [
         {

@@ -7,6 +7,7 @@ import '../theme/theme.dart';
 import 'browser_page.dart';
 import 'history_page.dart';
 import 'library_page.dart';
+import 'search_page.dart';
 import 'settings_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -21,7 +22,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final _queries = ['', '', ''];
   final _search = TextEditingController();
-  int _tab = 2;
+  int _tab = 0;
 
   @override
   void dispose() {
@@ -40,19 +41,19 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final pages = [
+      _explore(),
       HistoryPage(
-        catalog: widget.catalog,
-        settings: widget.settings,
-        embedded: true,
-        query: _queries[0],
-      ),
-      LibraryPage(
         catalog: widget.catalog,
         settings: widget.settings,
         embedded: true,
         query: _queries[1],
       ),
-      _explore(),
+      LibraryPage(
+        catalog: widget.catalog,
+        settings: widget.settings,
+        embedded: true,
+        query: _queries[2],
+      ),
     ];
     return Scaffold(
       appBar: AppBar(
@@ -62,11 +63,18 @@ class _HomePageState extends State<HomePage> {
           controller: _search,
           decoration: InputDecoration(
             hintText: _tab == 0
-                ? 'ค้นหาในประวัติ'
+                ? 'ค้นหาหนังและซีรีส์'
                 : _tab == 1
-                ? 'ค้นหาในรายการบันทึก'
-                : 'ค้นหาหนังและซีรีส์',
-            prefixIcon: const Icon(Icons.search),
+                ? 'ค้นหาในประวัติ'
+                : 'ค้นหาในรายการบันทึก',
+            prefixIcon: IconButton(
+              tooltip: 'ค้นหาจากเว็บไซต์',
+              icon: const Icon(Icons.search),
+              onPressed: () {
+                FocusScope.of(context).unfocus();
+                _startSearch();
+              },
+            ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 20),
           ),
           onChanged: (value) {
@@ -74,7 +82,7 @@ class _HomePageState extends State<HomePage> {
           },
           textInputAction: TextInputAction.search,
           onSubmitted: (_) {
-            if (_tab == 2) _searchAnimeRuka();
+            if (_tab == 0) _startSearch();
           },
         ),
         actions: [
@@ -115,7 +123,7 @@ class _HomePageState extends State<HomePage> {
               }
             },
             itemBuilder: (_) => [
-              if (_tab == 0 && widget.settings.history.isNotEmpty)
+              if (_tab == 1 && widget.settings.history.isNotEmpty)
                 const PopupMenuItem(
                   value: 'clear-history',
                   child: Text('ล้างประวัติ'),
@@ -135,16 +143,16 @@ class _HomePageState extends State<HomePage> {
           });
         },
         destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore),
+            label: 'Explore',
+          ),
           NavigationDestination(icon: Icon(Icons.history), label: 'History'),
           NavigationDestination(
             icon: Icon(Icons.favorite_border),
             selectedIcon: Icon(Icons.favorite),
             label: 'Favorites',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.explore_outlined),
-            selectedIcon: Icon(Icons.explore),
-            label: 'Explore',
           ),
         ],
       ),
@@ -223,18 +231,15 @@ class _HomePageState extends State<HomePage> {
     },
   );
 
-  void _searchAnimeRuka() {
+  void _startSearch() {
     final query = _search.text.trim();
     if (query.isEmpty) return;
-    final catalog = widget.catalog;
-    final site = catalog.sites.firstWhere((s) => s.id == 'animeruka');
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => BrowserPage(
-          site: site,
-          catalog: catalog,
+        builder: (_) => SearchPage(
+          catalog: widget.catalog,
           settings: widget.settings,
-          initialUrl: buildSearchUri(site, query),
+          query: query,
         ),
       ),
     );
