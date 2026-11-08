@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import 'src/catalog.dart';
-import 'src/home_page.dart';
-import 'src/settings.dart';
-import 'src/theme.dart';
+import 'src/core/catalog.dart';
+import 'src/core/settings.dart';
+import 'src/pages/home_page.dart';
+import 'src/theme/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

@@ -1,0 +1,41 @@
+{
+  "colors": {
+    "body": "#0E2F80",
+    "panel": "#153D9B",
+    "accent": "#FFD52A",
+    "accentSoft": "#FFF9D9",
+    "ink": "#173A86",
+    "mark": "#173D9D",
+    "markHover": "#143B96",
+    "muted": "#6D7F9F",
+    "white": "#FFFFFF",
+    "border": "#1FFFFFFF"
+  },
+  "fontFamily": "Kanit",
+  "fonts": [
+    {
+      "file": "Kanit-Regular.ttf",
+      "weight": 400
+    },
+    {
+      "file": "Kanit-SemiBold.ttf",
+      "weight": 600
+    }
+  ],
+  "sizes": {
+    "panelRadius": 12,
+    "linkRadius": 9,
+    "markRadius": 7,
+    "markSize": 36,
+    "linkMinHeight": 56,
+    "headingSize": 17,
+    "nameSize": 14,
+    "hostSize": 11,
+    "markFontSize": 13,
+    "siteGap": 7,
+    "contentGap": 10,
+    "paddingX": 9,
+    "paddingY": 7,
+    "transitionMs": 140
+  }
+}

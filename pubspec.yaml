@@ -22,9 +22,10 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/websites.json
-    - assets/rule_runtime.js
+    - assets/catalog/websites.json
+    - assets/runtime/rule_runtime.js
   fonts:
+    # Generated from assets/design/design_tokens.json.
     - family: Kanit
       fonts:
         - asset: assets/fonts/Kanit-Regular.ttf
@@ -35,5 +36,5 @@ flutter_launcher_icons:
   android: true
   ios: false
   image_path: assets/icon/app_icon.png
-  adaptive_icon_background: "#153D9B"
+  adaptive_icon_background: "#153D9B" # Generated from assets/design/design_tokens.json.
   adaptive_icon_foreground: assets/icon/app_icon_foreground.png

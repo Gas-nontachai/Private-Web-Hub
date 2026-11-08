@@ -1,0 +1,7 @@
+/* Generated from assets/catalog/websites.json. */
+#ads-popup,
+#ads-single,
+#ads,
+[id^="ads-"] {
+  display: none !important;
+}

@@ -1,4 +1,3 @@
-
 {
   "manifest_version": 3,
   "name": "Movie.exe",
@@ -23,7 +22,9 @@
         "https://www.serieday-z.com/*",
         "http://www.serieday-z.com/*"
       ],
-      "css": ["rules/serieday.css"],
+      "css": [
+        "rules/serieday.css"
+      ],
       "run_at": "document_start",
       "all_frames": true
     },
@@ -32,7 +33,9 @@
         "https://www.037-hdd.com/*",
         "http://www.037-hdd.com/*"
       ],
-      "css": ["rules/037-hdd.css"],
+      "css": [
+        "rules/037hdd.css"
+      ],
       "run_at": "document_start",
       "all_frames": true
     },
@@ -43,7 +46,9 @@
         "https://www.goseries4k.com/*",
         "http://www.goseries4k.com/*"
       ],
-      "css": ["rules/goseries4k.css"],
+      "css": [
+        "rules/goseries4k.css"
+      ],
       "run_at": "document_start",
       "all_frames": true
     },
@@ -52,7 +57,9 @@
         "https://*/*",
         "http://*/*"
       ],
-      "js": ["content/adgate-skip-global.js"],
+      "js": [
+        "content/adgate-skip-global.js"
+      ],
       "run_at": "document_start",
       "all_frames": true
     }

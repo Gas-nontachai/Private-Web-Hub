@@ -1,21 +1,3 @@
-const websites = [
-  {
-    name: "SerieDay",
-    url: "https://www.serieday-z.com/",
-    mark: "SD"
-  },
-  {
-    name: "037HDD",
-    url: "https://www.037-hdd.com/",
-    mark: "037"
-  },
-  {
-    name: "GoSeries4K",
-    url: "https://www.goseries4k.com/",
-    mark: "G4K"
-  }
-];
-
 const siteList = document.querySelector("#site-list");
 
 for (const website of websites) {

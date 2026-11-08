@@ -34,8 +34,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          version=$(python3 tool/release_extension.py version "$RELEASE_TAG")
-          build_number=$(python3 tool/release_extension.py android-code "$RELEASE_TAG")
+          version=$(python3 -m tool.release.release_extension version "$RELEASE_TAG")
+          build_number=$(python3 -m tool.release.release_extension android-code "$RELEASE_TAG")
           git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"
           tag_sha=$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")
           git merge-base --is-ancestor "$tag_sha" origin/main
@@ -53,30 +53,7 @@ jobs:
       - name: Check out tagged release source
         run: git checkout --detach "${{ steps.version.outputs.sha }}"
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.47.6'
-          channel: stable
-          cache: true
-
-      - name: Install dependencies and run Flutter checks
-        run: |
-          flutter pub get --enforce-lockfile
-          flutter analyze
-          flutter test
-
-      - name: Test Chrome extension packaging
-        run: |
-          python3 -m json.tool extension/manifest.json >/dev/null
-          python3 -m unittest discover -s tool -p 'test_*extension*.py'
-
-      - name: Test release notes generator
-        run: python3 -m unittest discover -s tool -p 'test_release_notes.py'
+      - uses: ./.github/actions/validate
 
       - name: Restore signing keystore
         env:
@@ -136,7 +113,7 @@ jobs:
           keytool -exportcert -keystore "$ANDROID_KEYSTORE_PATH" \
             -storepass:env ANDROID_KEYSTORE_PASSWORD -alias "$ANDROID_KEY_ALIAS" \
             -file "$RUNNER_TEMP/android-signing-cert.der"
-          python3 tool/verify_release_apk.py "$apk" \
+          python3 -m tool.release.verify_release_apk "$apk" \
             "$RUNNER_TEMP/android-signing-cert.der" \
             "$RUNNER_TEMP/apk-signing.txt" "$RUNNER_TEMP/apk-badging.txt" \
             "$RELEASE_VERSION" "$RELEASE_BUILD_NUMBER"
@@ -148,7 +125,7 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-release.apk "dist/Movie.exe-$RELEASE_TAG.apk"
-          python3 tool/package_extension_zip.py extension "$RELEASE_TAG" "dist/Movie.exe-$RELEASE_TAG.zip"
+          python3 -m tool.release.package_extension_zip extension "$RELEASE_TAG" "dist/Movie.exe-$RELEASE_TAG.zip"
           python3 - <<'PY'
           import os
           from pathlib import Path
@@ -173,7 +150,7 @@ jobs:
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: |
           set -euo pipefail
-          python3 tool/generate_release_notes.py "$RELEASE_TAG" \
+          python3 -m tool.release.generate_release_notes "$RELEASE_TAG" \
             --output "$RUNNER_TEMP/release-notes.md"
           gh release create "$RELEASE_TAG" dist/*.apk dist/*.zip \
             --verify-tag --title "Movie.exe $RELEASE_TAG" \
