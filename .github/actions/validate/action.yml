@@ -31,6 +31,9 @@ runs:
         python3 tool/generate_shared.py --check
         python3 -m unittest discover -s tool/tests -p 'test_*.py'
         node --test tool/tests/test_visibility.cjs
+    - name: Install Flutter NDK before Gradle configuration
+      shell: bash
+      run: python3 -m tool.android.install_ndk
     - name: Validate Flutter
       shell: bash
       run: |

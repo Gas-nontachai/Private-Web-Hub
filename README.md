@@ -29,6 +29,7 @@ test/
   pages/                     Screen tests
 tool/
   generate_shared.py         Shared asset generation/check entrypoint
+  android/                   CI NDK installation with targeted download retries
   gradle/                    Shared Kotlin mirror config and CI init script
   release/                   APK/ZIP validation and release metadata/notes
   templates/runtime/         JavaScript source templates and shared visibility logic
@@ -150,6 +151,15 @@ Both CI and Release use `.github/actions/validate` to pin Java 17, Python 3.12,
 Node 22 and Flutter 3.47.6, verify generated files, and run the Python, JavaScript
 and Flutter checks before building. Dependency downloads can still fail when a
 mirror or upstream service is unavailable; rerun after service recovery.
+
+CI and Release explicitly install the NDK version declared by the pinned Flutter
+SDK before Gradle runs. `tool/android/install_ndk.py` skips a complete existing
+installation. Archive corruption and recognized network errors trigger up to three
+install attempts with 15/30-second delays, clearing SDK download staging and only
+the failed version's partial NDK directory before retrying. Other errors (such as
+licenses or permissions) fail immediately. A repeated upstream failure still fails
+the job; inspect the dedicated NDK step's verbose log before rerunning. No NDK
+version override or alternate download mirror is introduced.
 
 Kotlin repository settings share `tool/gradle/kotlin-mirror.properties`. CI installs
 `tool/gradle/ci-kotlin-mirror.init.gradle` in Gradle's init directory and sets
