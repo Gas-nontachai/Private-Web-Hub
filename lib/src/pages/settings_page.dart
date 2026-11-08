@@ -22,6 +22,7 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   String? _appVersion;
   bool _checking = false;
+  bool _showAllSites = false;
 
   @override
   void initState() {
@@ -110,7 +111,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 if (mounted) setState(() {});
               },
             ),
-            for (final site in catalog.sites) ...[
+            for (final site in catalog.sites.take(_showAllSites ? catalog.sites.length : 3)) ...[
               const Divider(height: 1, indent: 72),
               SwitchListTile(
                 key: ValueKey('toggle-${site.id}'),
@@ -136,6 +137,14 @@ class _SettingsPageState extends State<SettingsPage> {
                   await widget.settings.setEnabled(site, v);
                   if (mounted) setState(() {});
                 },
+              ),
+            ],
+            if (catalog.sites.length > 3) ...[
+              const Divider(height: 1, indent: 72),
+              TextButton.icon(
+                onPressed: () => setState(() => _showAllSites = !_showAllSites),
+                icon: Icon(_showAllSites ? Icons.expand_less : Icons.expand_more),
+                label: Text(_showAllSites ? 'Show fewer sites' : 'Show all sites'),
               ),
             ],
           ]),
