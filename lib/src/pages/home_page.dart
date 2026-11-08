@@ -6,6 +6,7 @@ import '../core/updates.dart';
 import '../theme/theme.dart';
 import 'browser_page.dart';
 import 'history_page.dart';
+import 'library_page.dart';
 import 'settings_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -18,11 +19,13 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final _searchController = TextEditingController();
+  final _queries = ['', '', ''];
+  final _search = TextEditingController();
+  int _tab = 2;
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _search.dispose();
     super.dispose();
   }
 
@@ -36,125 +39,192 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final catalog = widget.catalog;
-    final settings = widget.settings;
+    final pages = [
+      HistoryPage(
+        catalog: widget.catalog,
+        settings: widget.settings,
+        embedded: true,
+        query: _queries[0],
+      ),
+      LibraryPage(
+        catalog: widget.catalog,
+        settings: widget.settings,
+        embedded: true,
+        query: _queries[1],
+      ),
+      _explore(),
+    ];
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Container(
-            clipBehavior: Clip.antiAlias,
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Palette.panel,
-              borderRadius: BorderRadius.circular(Design.panelRadius),
-              border: Border.all(color: Palette.border),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: Palette.accent,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'เลือกเว็บไซต์',
-                          style: TextStyle(
-                            fontSize: Design.headingSize,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'History',
-                        icon: const Icon(Icons.history),
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => HistoryPage(
-                              catalog: catalog,
-                              settings: settings,
-                            ),
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Settings',
-                        icon: const Icon(Icons.settings),
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => SettingsPage(
-                              catalog: catalog,
-                              settings: settings,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          key: const ValueKey('unified-search'),
-                          decoration: const InputDecoration(
-                            hintText: 'Search AnimeRuka',
-                            isDense: true,
-                            border: OutlineInputBorder(),
-                          ),
-                          textInputAction: TextInputAction.search,
-                          onSubmitted: (_) => _searchAnimeRuka(),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Search AnimeRuka',
-                        icon: const Icon(Icons.search),
-                        onPressed: _searchAnimeRuka,
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: ListView.separated(
-                    itemCount: catalog.sites.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(height: Design.siteGap),
-                    itemBuilder: (context, i) => _SiteLink(
-                      site: catalog.sites[i],
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => BrowserPage(
-                            site: catalog.sites[i],
-                            catalog: catalog,
-                            settings: settings,
-                          ),
-                        ),
-                      ),
+      appBar: AppBar(
+        toolbarHeight: 76,
+        title: TextField(
+          key: const ValueKey('unified-search'),
+          controller: _search,
+          decoration: InputDecoration(
+            hintText: _tab == 0
+                ? 'ค้นหาในประวัติ'
+                : _tab == 1
+                ? 'ค้นหาในรายการบันทึก'
+                : 'ค้นหาหนังและซีรีส์',
+            prefixIcon: const Icon(Icons.search),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+          ),
+          onChanged: (value) {
+            setState(() => _queries[_tab] = value);
+          },
+          textInputAction: TextInputAction.search,
+          onSubmitted: (_) {
+            if (_tab == 2) _searchAnimeRuka();
+          },
+        ),
+        actions: [
+          PopupMenuButton<String>(
+            tooltip: 'More options',
+            onSelected: (value) async {
+              if (value == 'settings') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => SettingsPage(
+                      catalog: widget.catalog,
+                      settings: widget.settings,
                     ),
                   ),
+                );
+              } else if (value == 'clear-history') {
+                final clear = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('ล้างประวัติ?'),
+                    content: const Text('รายการโปรดและดูภายหลังจะยังคงอยู่'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('ยกเลิก'),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('ล้าง'),
+                      ),
+                    ],
+                  ),
+                );
+                if (clear == true) {
+                  await widget.settings.clearHistory();
+                  if (mounted) setState(() {});
+                }
+              }
+            },
+            itemBuilder: (_) => [
+              if (_tab == 0 && widget.settings.history.isNotEmpty)
+                const PopupMenuItem(
+                  value: 'clear-history',
+                  child: Text('ล้างประวัติ'),
                 ),
-              ],
-            ),
+              const PopupMenuItem(value: 'settings', child: Text('Settings')),
+            ],
           ),
-        ),
+        ],
+      ),
+      body: IndexedStack(index: _tab, children: pages),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tab,
+        onDestinationSelected: (index) {
+          setState(() {
+            _tab = index;
+            _search.text = _queries[index];
+          });
+        },
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.history), label: 'History'),
+          NavigationDestination(
+            icon: Icon(Icons.favorite_border),
+            selectedIcon: Icon(Icons.favorite),
+            label: 'Favorites',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore),
+            label: 'Explore',
+          ),
+        ],
       ),
     );
   }
 
+  Widget _explore() => GridView.builder(
+    padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
+    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 3,
+      crossAxisSpacing: 14,
+      mainAxisSpacing: 18,
+      childAspectRatio: .82,
+    ),
+    itemCount: widget.catalog.sites.length,
+    itemBuilder: (context, index) {
+      final site = widget.catalog.sites[index];
+      return Semantics(
+        button: true,
+        label: '${site.name}, ${site.url.host}',
+        child: InkWell(
+          key: ValueKey('site-${site.id}'),
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => BrowserPage(
+                site: site,
+                catalog: widget.catalog,
+                settings: widget.settings,
+              ),
+            ),
+          ),
+          child: Column(
+            children: [
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Palette.appSurface,
+                    border: Border.all(color: Palette.appTextMuted, width: 1.5),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    site.mark,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Palette.appText,
+                      fontSize: site.mark.length > 3 ? 22 : 36,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                site.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              Text(
+                site.url.host,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Palette.appTextMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+
   void _searchAnimeRuka() {
-    final query = _searchController.text.trim();
+    final query = _search.text.trim();
     if (query.isEmpty) return;
     final catalog = widget.catalog;
     final site = catalog.sites.firstWhere((s) => s.id == 'animeruka');
@@ -165,103 +235,6 @@ class _HomePageState extends State<HomePage> {
           catalog: catalog,
           settings: widget.settings,
           initialUrl: buildSearchUri(site, query),
-        ),
-      ),
-    );
-  }
-}
-
-class _SiteLink extends StatefulWidget {
-  const _SiteLink({required this.site, required this.onTap});
-  final Site site;
-  final VoidCallback onTap;
-
-  @override
-  State<_SiteLink> createState() => _SiteLinkState();
-}
-
-class _SiteLinkState extends State<_SiteLink> {
-  bool _active = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final site = widget.site;
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _active = true),
-      onTapCancel: () => setState(() => _active = false),
-      onTapUp: (_) => setState(() => _active = false),
-      child: InkWell(
-        key: ValueKey('site-${site.id}'),
-        borderRadius: BorderRadius.circular(Design.linkRadius),
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: Design.transitionMs),
-          constraints: const BoxConstraints(minHeight: Design.linkMinHeight),
-          padding: const EdgeInsets.symmetric(
-            horizontal: Design.paddingX,
-            vertical: Design.paddingY,
-          ),
-          decoration: BoxDecoration(
-            color: _active ? Palette.accentSoft : Colors.white,
-            borderRadius: BorderRadius.circular(Design.linkRadius),
-            border: Border.all(
-              color: _active ? Palette.accent : Colors.transparent,
-              width: 2,
-            ),
-          ),
-          child: Row(
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: Design.transitionMs),
-                width: Design.markSize,
-                height: Design.markSize,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: _active ? Palette.accent : Palette.mark,
-                  borderRadius: BorderRadius.circular(Design.markRadius),
-                ),
-                child: Text(
-                  site.mark,
-                  style: TextStyle(
-                    fontSize: Design.markFontSize,
-                    fontWeight: FontWeight.w600,
-                    color: _active ? Palette.markHover : Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(width: Design.contentGap),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      site.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: Design.nameSize,
-                        fontWeight: FontWeight.w600,
-                        color: Palette.ink,
-                      ),
-                    ),
-                    Text(
-                      site.url.host,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: Design.hostSize,
-                        color: Palette.muted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.only(right: 3),
-                child: Icon(Icons.chevron_right, size: 20, color: Palette.mark),
-              ),
-            ],
-          ),
         ),
       ),
     );

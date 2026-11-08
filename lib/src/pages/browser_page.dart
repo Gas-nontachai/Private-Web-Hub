@@ -42,7 +42,9 @@ class _BrowserPageState extends State<BrowserPage> {
   }
 
   Future<void> _prepareScript() async {
-    final template = await rootBundle.loadString('assets/runtime/rule_runtime.js');
+    final template = await rootBundle.loadString(
+      'assets/runtime/rule_runtime.js',
+    );
     if (!mounted) return;
     setState(() {
       _script = UserScript(
@@ -124,6 +126,23 @@ class _BrowserPageState extends State<BrowserPage> {
               icon: const Icon(Icons.home),
               onPressed: () => Navigator.of(context).pop(),
             ),
+            PopupMenuButton<String>(
+              tooltip: 'Save page',
+              icon: const Icon(Icons.bookmark_add_outlined),
+              onSelected: _saveCurrentPage,
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'favorite', child: Text('รายการโปรด')),
+                PopupMenuItem(value: 'watchLater', child: Text('ดูภายหลัง')),
+              ],
+            ),
+            IconButton(
+              tooltip: 'Open in external browser',
+              icon: const Icon(Icons.open_in_browser),
+              onPressed: () async {
+                final url = await _controller?.getUrl();
+                if (url != null) await _openExternal(url.uriValue);
+              },
+            ),
           ],
           bottom: _progress < 1
               ? PreferredSize(
@@ -183,19 +202,20 @@ class _BrowserPageState extends State<BrowserPage> {
                       // Rules are idempotent, so reapplying after navigation is safe.
                       await c.evaluateJavascript(source: script.source);
                       await _refreshNavState();
-                    },
-                    onUpdateVisitedHistory: (c, url, _) async {
-                      await _refreshNavState();
                       final uri = url?.uriValue;
                       if (uri != null &&
                           decideNavigation(uri, widget.catalog) ==
-                              NavDecision.allowInApp) {
+                              NavDecision.allowInApp &&
+                          _error == null) {
                         await widget.settings.recordVisit(
                           widget.site,
                           uri,
                           await c.getTitle(),
                         );
                       }
+                    },
+                    onUpdateVisitedHistory: (c, url, _) async {
+                      await _refreshNavState();
                     },
                     onReceivedError: (c, request, error) {
                       if (request.isForMainFrame ?? false) {
@@ -233,6 +253,26 @@ class _BrowserPageState extends State<BrowserPage> {
               ),
       ),
     );
+  }
+
+  Future<void> _saveCurrentPage(String collection) async {
+    final url = await _controller?.getUrl();
+    if (url == null ||
+        decideNavigation(url.uriValue, widget.catalog) !=
+            NavDecision.allowInApp) {
+      return;
+    }
+    await widget.settings.toggleSavedPage(
+      widget.site,
+      url.uriValue,
+      await _controller?.getTitle() ?? '',
+      collection,
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('รายการบันทึกอัปเดตแล้ว')));
+    }
   }
 
   // Only taps requested by an allowlisted page are forwarded to native input.

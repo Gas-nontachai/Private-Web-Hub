@@ -10,6 +10,11 @@
   --muted: #6D7F9F;
   --white: #FFFFFF;
   --border: #FFFFFF1F;
+  --appBackground: #121212;
+  --appSurface: #262626;
+  --appSurfaceActive: #414141;
+  --appText: #F2F2F2;
+  --appTextMuted: #C6C6C6;
   --font-family: 'Kanit';
   --panelRadius: 12px;
   --linkRadius: 9px;

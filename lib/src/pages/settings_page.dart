@@ -45,11 +45,32 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _clearData() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear browsing data?'),
+        content: const Text(
+          'This clears cookies, cache and website storage. History and saved pages stay on this device.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) {
+      return;
+    }
     final messenger = ScaffoldMessenger.of(context);
     await CookieManager.instance().deleteAllCookies();
     await InAppWebViewController.clearAllCache();
     await WebStorageManager.instance().deleteAllData();
-    await widget.settings.clearHistory();
     messenger.showSnackBar(
       const SnackBar(content: Text('Browsing data cleared')),
     );
@@ -91,7 +112,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ListTile(
             leading: const Icon(Icons.delete_outline),
             title: const Text('Clear browsing data'),
-            subtitle: const Text('Cookies, cache, site storage and history'),
+            subtitle: const Text('Cookies, cache and site storage'),
             onTap: _clearData,
           ),
           ListTile(

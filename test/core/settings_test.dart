@@ -45,4 +45,34 @@ void main() {
     });
     expect((await SiteSettings.load()).history, hasLength(1));
   });
+
+  test('saved pages toggle idempotently by normalized source URL and survive history clear', () async {
+    SharedPreferences.setMockInitialValues({});
+    final settings = await SiteSettings.load();
+    final site = Catalog.parse(
+      '''{"schemaVersion":1,"version":"1","sites":[{"id":"demo","name":"Demo","mark":"D","url":"https://example.com","hosts":["example.com"],"rules":[]}]}''',
+    ).sites.single;
+    await settings.toggleSavedPage(
+      site,
+      Uri.parse('HTTPS://EXAMPLE.COM/page#one'),
+      'Page',
+      'favorite',
+    );
+    await settings.toggleSavedPage(
+      site,
+      Uri.parse('https://example.com/page#two'),
+      'Page',
+      'watchLater',
+    );
+    await settings.toggleSavedPage(
+      site,
+      Uri.parse('https://example.com/page#three'),
+      'Page',
+      'favorite',
+    );
+    expect(settings.savedPages('favorite'), isEmpty);
+    expect(settings.savedPages('watchLater'), hasLength(1));
+    await settings.clearHistory();
+    expect(settings.savedPages('watchLater'), hasLength(1));
+  });
 }

@@ -9,16 +9,30 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   testWidgets('home renders all configured sites', (tester) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
     SharedPreferences.setMockInitialValues({});
     final catalog = Catalog.parse(
       File('assets/catalog/websites.json').readAsStringSync(),
     );
     final settings = await SiteSettings.load();
     await tester.pumpWidget(MainApp(catalog: catalog, settings: settings));
-    expect(tester.widget<MaterialApp>(find.byType(MaterialApp)).title, 'Movie.exe');
+    expect(
+      tester.widget<MaterialApp>(find.byType(MaterialApp)).title,
+      'Movie.exe',
+    );
     for (final name in ['SerieDay', '037HDD', 'GoSeries4K', 'AnimeRuka']) {
       expect(find.text(name), findsOneWidget);
     }
     expect(find.byKey(const ValueKey('unified-search')), findsOneWidget);
+    expect(find.text('History'), findsOneWidget);
+    expect(find.text('Favorites'), findsOneWidget);
+    expect(find.text('Explore'), findsOneWidget);
+    await tester.tap(find.text('Favorites'));
+    await tester.pumpAndSettle();
+    expect(find.text('ยังไม่มีรายการโปรด'), findsOneWidget);
+    expect(find.text('ค้นหาในรายการบันทึก'), findsOneWidget);
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
   });
 }
