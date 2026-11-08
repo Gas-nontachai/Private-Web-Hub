@@ -1,0 +1,39 @@
+name: Setup and validate
+description: Shared toolchain and source checks
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.47.6'
+        channel: stable
+        cache: true
+    - name: Install Kotlin mirror for included builds
+      shell: bash
+      run: |
+        gradle_home="${GRADLE_USER_HOME:-$HOME/.gradle}"
+        mkdir -p "$gradle_home/init.d"
+        cp tool/gradle/ci-kotlin-mirror.init.gradle "$gradle_home/init.d/movie-kotlin-mirror.gradle"
+        echo "MOVIE_KOTLIN_MIRROR_CONFIG=$GITHUB_WORKSPACE/tool/gradle/kotlin-mirror.properties" >> "$GITHUB_ENV"
+    - name: Validate shared assets and tooling
+      shell: bash
+      run: |
+        python3 tool/generate_shared.py --check
+        python3 -m unittest discover -s tool/tests -p 'test_*.py'
+        node --test tool/tests/test_visibility.cjs
+    - name: Validate Flutter
+      shell: bash
+      run: |
+        flutter pub get --enforce-lockfile
+        flutter analyze
+        flutter test

@@ -11,10 +11,14 @@ pluginManagement {
     includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
     repositories {
+        val mirror = java.util.Properties().apply {
+            file("../tool/gradle/kotlin-mirror.properties").inputStream().use { load(it) }
+        }
+
         // Prefer mirror for Kotlin artifacts when Maven Central redirects fail.
         maven {
-            url = uri("https://maven.aliyun.com/repository/public")
-            content { includeGroup("org.jetbrains.kotlin") }
+            url = uri(mirror.getProperty("url"))
+            content { includeGroup(mirror.getProperty("group")) }
         }
         google()
         mavenCentral()

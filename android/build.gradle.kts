@@ -1,9 +1,13 @@
 allprojects {
     repositories {
+        val mirror = java.util.Properties().apply {
+            rootProject.file("../tool/gradle/kotlin-mirror.properties").inputStream().use { load(it) }
+        }
+
         // Kotlin compiler downloads have hit GitHub HTTP 504 in CI.
         maven {
-            url = uri("https://maven.aliyun.com/repository/public")
-            content { includeGroup("org.jetbrains.kotlin") }
+            url = uri(mirror.getProperty("url"))
+            content { includeGroup(mirror.getProperty("group")) }
         }
         google()
         mavenCentral()
