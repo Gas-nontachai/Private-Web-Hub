@@ -1,5 +1,5 @@
 import 'dart:convert';
-
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'catalog.dart';
@@ -8,6 +8,23 @@ import 'catalog.dart';
 class SiteSettings {
   SiteSettings(this._prefs);
   final SharedPreferences _prefs;
+  final faviconRevision = ValueNotifier<int>(0);
+
+  Uint8List? favicon(String siteId) {
+    final value = _prefs.getString('site_favicon_$siteId');
+    if (value == null) return null;
+    try {
+      return base64Decode(value);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveFavicon(String siteId, Uint8List bytes) async {
+    if (bytes.isEmpty || bytes.length > 512 * 1024) return;
+    await _prefs.setString('site_favicon_$siteId', base64Encode(bytes));
+    faviconRevision.value++;
+  }
 
   List<BrowseEntry> get history {
     try {

@@ -17,6 +17,12 @@ void main() {
     ]);
     expect(c.sites.map((s) => s.id).toSet().length, c.sites.length);
     expect(c.sites.every((s) => s.url.scheme == 'https'), isTrue);
+    expect(c.sites.map((s) => s.category), [
+      'หนัง/ซีรี่ย์',
+      'หนัง/ซีรี่ย์',
+      'หนัง/ซีรี่ย์',
+      'อนิเมะ',
+    ]);
   });
 
   test('configured search URLs encode Thai text and reserved characters', () {

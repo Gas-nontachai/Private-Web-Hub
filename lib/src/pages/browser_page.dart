@@ -201,6 +201,8 @@ class _BrowserPageState extends State<BrowserPage> {
                         callback: (args) => _nativeTap(args),
                       );
                     },
+                    onReceivedIcon: (_, icon) =>
+                        widget.settings.saveFavicon(widget.site.id, icon),
                     shouldOverrideUrlLoading: (c, action) async {
                       final uri = action.request.url?.uriValue;
                       if (uri == null) return NavigationActionPolicy.CANCEL;

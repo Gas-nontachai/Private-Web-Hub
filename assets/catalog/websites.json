@@ -5,6 +5,7 @@
     {
       "id": "serieday",
       "name": "SerieDay",
+      "category": "หนัง/ซีรี่ย์",
       "mark": "SD",
       "url": "https://www.serieday-z.com/",
       "hosts": [
@@ -36,6 +37,7 @@
     {
       "id": "037hdd",
       "name": "037HDD",
+      "category": "หนัง/ซีรี่ย์",
       "mark": "037",
       "url": "https://www.037-hdd.com/",
       "hosts": [
@@ -67,6 +69,7 @@
     {
       "id": "goseries4k",
       "name": "GoSeries4K",
+      "category": "หนัง/ซีรี่ย์",
       "mark": "G4K",
       "url": "https://www.goseries4k.com/",
       "hosts": [
@@ -98,6 +101,7 @@
     {
       "id": "animeruka",
       "name": "AnimeRuka",
+      "category": "อนิเมะ",
       "mark": "AR",
       "url": "https://animeruka.com/",
       "hosts": [

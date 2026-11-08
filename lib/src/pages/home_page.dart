@@ -26,6 +26,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    widget.settings.faviconRevision.removeListener(_refreshFavicons);
     _search.dispose();
     super.dispose();
   }
@@ -33,9 +34,14 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    widget.settings.faviconRevision.addListener(_refreshFavicons);
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => checkForUpdates(context, manual: false),
     );
+  }
+
+  void _refreshFavicons() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -196,15 +202,45 @@ class _HomePageState extends State<HomePage> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                   alignment: Alignment.center,
-                  child: Text(
-                    site.mark,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Palette.appText,
-                      fontSize: site.mark.length > 3 ? 22 : 36,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (widget.settings.favicon(site.id) case final icon?)
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Image.memory(
+                            icon,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, _, _) => _siteMark(site.mark),
+                          ),
+                        )
+                      else
+                        _siteMark(site.mark),
+                      Positioned(
+                        top: 5,
+                        right: 5,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Palette.appSurfaceActive,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 3,
+                            ),
+                            child: Text(
+                              site.category,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -229,6 +265,19 @@ class _HomePageState extends State<HomePage> {
         ),
       );
     },
+  );
+
+  Widget _siteMark(String mark) => Center(
+    child: Text(
+      mark,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: Palette.appText,
+        fontSize: mark.length > 3 ? 22 : 36,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
   );
 
   void _startSearch() {

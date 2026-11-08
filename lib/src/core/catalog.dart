@@ -46,6 +46,7 @@ class Site {
   const Site({
     required this.id,
     required this.name,
+    required this.category,
     required this.mark,
     required this.url,
     required this.hosts,
@@ -55,6 +56,7 @@ class Site {
   });
   final String id;
   final String name;
+  final String category;
   final String mark;
   final Uri url;
   final List<String> hosts;
@@ -144,6 +146,7 @@ class Catalog {
     return Site(
       id: _str(j, 'id'),
       name: _str(j, 'name'),
+      category: j['category'] as String? ?? '',
       mark: _str(j, 'mark'),
       url: url,
       hosts: hosts,
