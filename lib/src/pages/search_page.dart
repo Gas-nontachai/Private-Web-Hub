@@ -24,10 +24,30 @@ class _SearchPageState extends State<SearchPage> {
   late final List<Site> _sites = widget.catalog.sites
       .where((site) => site.search != null)
       .toList();
-  late final Set<String> _selectedSites = _sites.map((site) => site.id).toSet();
+  late final Set<String> _selectedSites = widget.settings.searchSites == null
+      ? _sites.map((site) => site.id).toSet()
+      : widget.settings.searchSites!
+            .intersection(_sites.map((site) => site.id).toSet());
   late final Map<String, BrowserLoadState> _states = {
     for (final site in _sites) site.id: BrowserLoadState.loading,
   };
+
+  Future<void> _showFilters() async {
+    final selected = await showDialog<Set<String>>(
+      context: context,
+      builder: (context) => _SearchFilterDialog(
+        sites: _sites,
+        selectedSites: _selectedSites,
+      ),
+    );
+    if (selected == null) return;
+    await widget.settings.setSearchSites(selected);
+    if (mounted) setState(() {
+      _selectedSites
+        ..clear()
+        ..addAll(selected);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,37 +63,18 @@ class _SearchPageState extends State<SearchPage> {
           return Scaffold(
             appBar: AppBar(
               title: Text('ผลค้นหา: ${widget.query}'),
+              actions: [
+                IconButton(
+                  tooltip: 'Filter',
+                  icon: const Icon(Icons.filter_list),
+                  onPressed: _showFilters,
+                ),
+              ],
               bottom: PreferredSize(
-                preferredSize: Size.fromHeight(sites.isEmpty ? 52 : 104),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      height: 52,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        children: [
-                          for (final site in _sites)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: FilterChip(
-                                label: Text(site.name),
-                                selected: _selectedSites.contains(site.id),
-                                onSelected: (selected) => setState(() {
-                                  if (selected) {
-                                    _selectedSites.add(site.id);
-                                  } else {
-                                    _selectedSites.remove(site.id);
-                                  }
-                                }),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    if (sites.isNotEmpty)
-                      TabBar(
+                preferredSize: Size.fromHeight(sites.isEmpty ? 0 : 48),
+                child: sites.isEmpty
+                    ? const SizedBox.shrink()
+                    : TabBar(
                         isScrollable: true,
                         tabs: [
                           for (final site in sites)
@@ -89,8 +90,6 @@ class _SearchPageState extends State<SearchPage> {
                             ),
                         ],
                       ),
-                  ],
-                ),
               ),
             ),
             body: sites.isEmpty
@@ -129,4 +128,94 @@ class _SearchPageState extends State<SearchPage> {
     BrowserLoadState.loaded => const Icon(Icons.check_circle, size: 16),
     BrowserLoadState.failed => const Icon(Icons.error_outline, size: 16),
   };
+}
+
+class _SearchFilterDialog extends StatefulWidget {
+  const _SearchFilterDialog({required this.sites, required this.selectedSites});
+  final List<Site> sites;
+  final Set<String> selectedSites;
+
+  @override
+  State<_SearchFilterDialog> createState() => _SearchFilterDialogState();
+}
+
+class _SearchFilterDialogState extends State<_SearchFilterDialog> {
+  late final Set<String> _selected = {...widget.selectedSites};
+  late final List<String> _categories = widget.sites
+      .map((site) => site.category)
+      .toSet()
+      .toList();
+  late final Set<String> _selectedCategories = {..._categories};
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Filter'),
+    content: SizedBox(
+      width: 420,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final category in _categories)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(category.isEmpty ? 'อื่นๆ' : category),
+                      selected: _selectedCategories.contains(category),
+                      onSelected: (selected) => setState(() {
+                        if (selected) {
+                          _selectedCategories.add(category);
+                        } else {
+                          _selectedCategories.remove(category);
+                        }
+                      }),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Flexible(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final site in widget.sites.where(
+                    (site) => _selectedCategories.contains(site.category),
+                  ))
+                    CheckboxListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(site.name),
+                      value: _selected.contains(site.id),
+                      onChanged: (value) => setState(() {
+                        if (value == true) {
+                          _selected.add(site.id);
+                        } else {
+                          _selected.remove(site.id);
+                        }
+                      }),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(context, _selected),
+        child: const Text('Apply'),
+      ),
+    ],
+  );
 }

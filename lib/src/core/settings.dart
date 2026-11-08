@@ -178,6 +178,11 @@ class SiteSettings {
 
   Future<void> setEnabled(Site site, bool value) =>
       _prefs.setBool('rules_enabled_${site.id}', value);
+
+  Set<String>? get searchSites => _prefs.getStringList('search_sites')?.toSet();
+
+  Future<void> setSearchSites(Set<String> siteIds) =>
+      _prefs.setStringList('search_sites', siteIds.toList());
 }
 
 String normalizeIdentityUrl(Uri url) => url
