@@ -42,11 +42,13 @@ class _SearchPageState extends State<SearchPage> {
     );
     if (selected == null) return;
     await widget.settings.setSearchSites(selected);
-    if (mounted) setState(() {
-      _selectedSites
-        ..clear()
-        ..addAll(selected);
-    });
+    if (mounted) {
+      setState(() {
+        _selectedSites
+          ..clear()
+          ..addAll(selected);
+      });
+    }
   }
 
   @override
