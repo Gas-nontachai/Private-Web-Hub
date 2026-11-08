@@ -91,6 +91,37 @@
           ]
         }
       ]
+    },
+    {
+      "id": "animeruka",
+      "name": "AnimeRuka",
+      "mark": "AR",
+      "url": "https://animeruka.com/",
+      "hosts": [
+        "animeruka.com"
+      ],
+      "enabled": true,
+      "rules": [
+        {
+          "id": "animeruka-hide-ads",
+          "hosts": [
+            "animeruka.com"
+          ],
+          "enabled": true,
+          "actions": [
+            {
+              "type": "hide",
+              "selectors": [
+                "#box-side-r",
+                "#box-side-l",
+                "[id^=\"ad-group-\"]",
+                "#box-footer-fix",
+                ".ar-adgrid"
+              ]
+            }
+          ]
+        }
+      ]
     }
   ],
   "globalRules": [

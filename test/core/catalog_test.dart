@@ -7,10 +7,30 @@ import 'package:movieapps/src/core/catalog.dart';
 void main() {
   final source = File('assets/catalog/websites.json').readAsStringSync();
 
-  test('bundled catalog has the three sites', () {
+  test('bundled catalog has the configured sites once', () {
     final c = Catalog.parse(source);
-    expect(c.sites.map((s) => s.name), ['SerieDay', '037HDD', 'GoSeries4K']);
+    expect(c.sites.map((s) => s.name), [
+      'SerieDay', '037HDD', 'GoSeries4K', 'AnimeRuka',
+    ]);
+    expect(c.sites.map((s) => s.id).toSet().length, c.sites.length);
     expect(c.sites.every((s) => s.url.scheme == 'https'), isTrue);
+  });
+
+  test('AnimeRuka search URL encodes Thai text and spaces', () {
+    final c = Catalog.parse(source);
+    final site = c.sites.singleWhere((s) => s.id == 'animeruka');
+    expect(site.url.toString(), 'https://animeruka.com/');
+    expect(
+      buildSearchUri(site, 'รักนะ 2026').toString(),
+      'https://animeruka.com/?s=%E0%B8%A3%E0%B8%B1%E0%B8%81%E0%B8%99%E0%B8%B0%202026',
+    );
+    expect(
+      site.rules.single.actions.single.selectors,
+      [
+        '#box-side-r', '#box-side-l', '[id^="ad-group-"]',
+        '#box-footer-fix', '.ar-adgrid',
+      ],
+    );
   });
 
   test(

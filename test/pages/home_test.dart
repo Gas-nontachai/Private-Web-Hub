@@ -16,8 +16,9 @@ void main() {
     final settings = await SiteSettings.load();
     await tester.pumpWidget(MainApp(catalog: catalog, settings: settings));
     expect(tester.widget<MaterialApp>(find.byType(MaterialApp)).title, 'Movie.exe');
-    for (final name in ['SerieDay', '037HDD', 'GoSeries4K']) {
+    for (final name in ['SerieDay', '037HDD', 'GoSeries4K', 'AnimeRuka']) {
       expect(find.text(name), findsOneWidget);
     }
+    expect(find.byKey(const ValueKey('unified-search')), findsOneWidget);
   });
 }

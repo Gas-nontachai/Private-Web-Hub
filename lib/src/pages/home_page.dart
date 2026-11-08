@@ -18,6 +18,14 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -93,6 +101,31 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          key: const ValueKey('unified-search'),
+                          decoration: const InputDecoration(
+                            hintText: 'Search AnimeRuka',
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                          ),
+                          textInputAction: TextInputAction.search,
+                          onSubmitted: (_) => _searchAnimeRuka(),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Search AnimeRuka',
+                        icon: const Icon(Icons.search),
+                        onPressed: _searchAnimeRuka,
+                      ),
+                    ],
+                  ),
+                ),
                 Expanded(
                   child: ListView.separated(
                     itemCount: catalog.sites.length,
@@ -115,6 +148,23 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  void _searchAnimeRuka() {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) return;
+    final catalog = widget.catalog;
+    final site = catalog.sites.firstWhere((s) => s.id == 'animeruka');
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BrowserPage(
+          site: site,
+          catalog: catalog,
+          settings: widget.settings,
+          initialUrl: buildSearchUri(site, query),
         ),
       ),
     );

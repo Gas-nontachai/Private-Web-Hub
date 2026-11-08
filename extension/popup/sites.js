@@ -14,5 +14,10 @@ const websites = [
     "name": "GoSeries4K",
     "url": "https://www.goseries4k.com/",
     "mark": "G4K"
+  },
+  {
+    "name": "AnimeRuka",
+    "url": "https://animeruka.com/",
+    "mark": "AR"
   }
 ];

@@ -61,6 +61,16 @@ class Site {
   final List<Rule> rules;
 }
 
+/// Builds the site search URL for providers that expose a query parameter.
+Uri buildSearchUri(Site site, String query) {
+  if (site.id == 'animeruka') {
+    return Uri.parse(
+      '${site.url.origin}/?s=${Uri.encodeComponent(query)}',
+    );
+  }
+  throw ArgumentError.value(site.id, 'site', 'No search URL configured');
+}
+
 class Catalog {
   const Catalog({
     required this.version,
