@@ -4,6 +4,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../core/catalog.dart';
 import '../core/settings.dart';
 import '../core/updates.dart';
+import '../theme/theme.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({
@@ -82,63 +83,130 @@ class _SettingsPageState extends State<SettingsPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Text('Page rules'),
+          Text(
+            'Make Movie.exe yours',
+            style: Theme.of(context).textTheme.headlineSmall
+                ?.copyWith(fontWeight: FontWeight.w700),
           ),
-          SwitchListTile(
-            key: const ValueKey('toggle-global'),
-            title: const Text('All sites'),
-            subtitle: const Text('Auto-skip "ข้ามโฆษณา" buttons everywhere'),
-            value: widget.settings.globalEnabled,
-            onChanged: (v) async {
-              await widget.settings.setGlobalEnabled(v);
-              setState(() {});
-            },
+          const SizedBox(height: 4),
+          const Text(
+            'Control browsing rules and local website data.',
+            style: TextStyle(color: Palette.appTextMuted),
           ),
-          for (final site in catalog.sites)
+          const SizedBox(height: 26),
+          _sectionTitle(Icons.shield_outlined, 'Browsing rules'),
+          const SizedBox(height: 10),
+          _group([
             SwitchListTile(
-              key: ValueKey('toggle-${site.id}'),
-              title: Text(site.name),
-              subtitle: Text('${site.rules.length} rule(s)'),
-              value: widget.settings.isEnabled(site),
+              key: const ValueKey('toggle-global'),
+              secondary: const Icon(Icons.auto_awesome_outlined),
+              title: const Text('All sites'),
+              subtitle: const Text('Auto-skip ad buttons on every site'),
+              value: widget.settings.globalEnabled,
               onChanged: (v) async {
-                await widget.settings.setEnabled(site, v);
-                setState(() {});
+                await widget.settings.setGlobalEnabled(v);
+                if (mounted) setState(() {});
               },
             ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.delete_outline),
-            title: const Text('Clear browsing data'),
-            subtitle: const Text('Cookies, cache and site storage'),
-            onTap: _clearData,
-          ),
-          ListTile(
-            leading: const Icon(Icons.system_update),
-            title: const Text('Check for updates'),
-            subtitle: Text(
-              _appVersion == null
-                  ? 'Version unavailable'
-                  : 'Version $_appVersion',
+            for (final site in catalog.sites) ...[
+              const Divider(height: 1, indent: 72),
+              SwitchListTile(
+                key: ValueKey('toggle-${site.id}'),
+                secondary: CircleAvatar(
+                  backgroundColor: Palette.appSurfaceActive,
+                  child: Text(
+                    site.mark,
+                    style: const TextStyle(
+                      color: Palette.appText,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                title: Text(site.name),
+                subtitle: Text(
+                  '${site.url.host} · ${site.rules.length} rule(s)',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                value: widget.settings.isEnabled(site),
+                onChanged: (v) async {
+                  await widget.settings.setEnabled(site, v);
+                  if (mounted) setState(() {});
+                },
+              ),
+            ],
+          ]),
+          const SizedBox(height: 26),
+          _sectionTitle(Icons.tune, 'App & data'),
+          const SizedBox(height: 10),
+          _group([
+            ListTile(
+              leading: const Icon(
+                Icons.delete_outline,
+                color: Colors.orangeAccent,
+              ),
+              title: const Text('Clear browsing data'),
+              subtitle: const Text('Cookies, cache and website storage'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _clearData,
             ),
-            trailing: _checking
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : null,
-            onTap: _checking ? null : () => _checkUpdates(),
-          ),
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text('Rule version'),
-            subtitle: Text(catalog.version),
+            const Divider(height: 1, indent: 72),
+            ListTile(
+              leading: const Icon(Icons.system_update_alt),
+              title: const Text('Check for updates'),
+              subtitle: Text(
+                _appVersion == null
+                    ? 'Version unavailable'
+                    : 'Installed version $_appVersion',
+              ),
+              trailing: _checking
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.chevron_right),
+              onTap: _checking ? null : _checkUpdates,
+            ),
+            const Divider(height: 1, indent: 72),
+            ListTile(
+              leading: const Icon(Icons.rule_folder_outlined),
+              title: const Text('Rule version'),
+              subtitle: Text('Catalog ${catalog.version}'),
+              trailing: const Icon(Icons.verified_outlined),
+            ),
+          ]),
+          const SizedBox(height: 18),
+          Center(
+            child: Text(
+              _appVersion == null ? 'Movie.exe' : 'Movie.exe · $_appVersion',
+              style: const TextStyle(color: Palette.appTextMuted, fontSize: 12),
+            ),
           ),
         ],
       ),
     );
   }
+
+  Widget _sectionTitle(IconData icon, String title) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 4),
+    child: Row(
+      children: [
+        Icon(icon, size: 20, color: Palette.appTextMuted),
+        const SizedBox(width: 10),
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      ],
+    ),
+  );
+
+  Widget _group(List<Widget> children) => Card(
+    margin: EdgeInsets.zero,
+    color: Palette.appSurface,
+    clipBehavior: Clip.antiAlias,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    child: Column(mainAxisSize: MainAxisSize.min, children: children),
+  );
 }
