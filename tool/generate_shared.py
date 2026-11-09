@@ -64,7 +64,10 @@ def outputs(root=ROOT):
                     selectors.extend(action['selectors'])
         filename = f"rules/{site['id']}.css"
         put('extension/' + filename, '/* Generated from assets/catalog/websites.json. */\n' + ',\n'.join(selectors) + (' {\n  display: none !important;\n}\n' if selectors else ''))
-        scripts.append({'matches': [f'{scheme}://{host}/*' for host in site['hosts'] for scheme in ('https', 'http')], 'css': [filename], 'run_at': 'document_start', 'all_frames': True})
+        script = {'matches': [f'{scheme}://{host}/*' for host in site['hosts'] for scheme in ('https', 'http')], 'css': [filename], 'run_at': 'document_start', 'all_frames': True}
+        if site['id'] == 'animeruka':
+            script['js'] = ['content/animeruka-hide-ads.js']
+        scripts.append(script)
     globals_ = catalog.get('globalRules', [])
     if (len(globals_) != 1 or globals_[0]['hosts'] != ['*']
             or globals_[0].get('parentHosts') or not globals_[0]['actions']
@@ -81,6 +84,15 @@ def outputs(root=ROOT):
         if template.startswith('adgate'):
             text = text.replace('__SKIP_SELECTOR__', json.dumps(','.join(selectors)))
         put(destination, HEADER + text)
+    animeruka_selectors = [
+        selector
+        for site in catalog['sites'] if site['id'] == 'animeruka'
+        for rule in site['rules'] if rule.get('enabled', True) and site.get('enabled', True)
+        for action in rule['actions'] if action['type'] == 'hide'
+        for selector in action['selectors']
+    ]
+    animeruka_runtime = (root / 'tool/templates/runtime/animeruka-hide-ads.js.in').read_text()
+    put('extension/content/animeruka-hide-ads.js', HEADER + animeruka_runtime.replace('__HIDE_SELECTORS__', json.dumps(animeruka_selectors)))
     pubspec = (root / 'pubspec.yaml').read_text()
     font_block = '  fonts:\n    # Generated from assets/design/design_tokens.json.\n    - family: ' + tokens['fontFamily'] + '\n      fonts:\n'
     for font in tokens['fonts']:

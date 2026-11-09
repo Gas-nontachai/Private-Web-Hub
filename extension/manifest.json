@@ -61,7 +61,10 @@
         "rules/animeruka.css"
       ],
       "run_at": "document_start",
-      "all_frames": true
+      "all_frames": true,
+      "js": [
+        "content/animeruka-hide-ads.js"
+      ]
     },
     {
       "matches": [
