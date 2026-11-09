@@ -6,8 +6,8 @@ body {
   width: 350px;
   margin: 0;
   padding: 10px;
-  color: var(--white);
-  background: var(--body);
+  color: var(--appText);
+  background: var(--appBackground);
   font: var(--nameSize)/1.4 var(--font-family), sans-serif;
 }
 
@@ -16,7 +16,7 @@ body {
   padding: 10px;
   border: 1px solid var(--border);
   border-radius: var(--panelRadius);
-  background: var(--panel);
+  background: var(--appSurface);
 }
 
 .popup::before {
@@ -24,11 +24,14 @@ body {
   height: 4px;
   margin-bottom: 12px;
   border-radius: 999px;
-  background: var(--accent);
+  background: linear-gradient(90deg, #8bd5ff, #ec6bb5);
   content: "";
 }
 
 .header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 10px;
 }
 
@@ -51,20 +54,20 @@ h1 {
   padding: var(--paddingY) var(--paddingX);
   border: 2px solid transparent;
   border-radius: var(--linkRadius);
-  color: var(--ink);
-  background: var(--white);
+  color: var(--appText);
+  background: var(--appSurfaceActive);
   text-decoration: none;
   transition: border-color var(--transitionMs) ease, background-color var(--transitionMs) ease;
 }
 
 .site-link:hover,
 .site-link:focus-visible {
-  border-color: var(--accent);
-  background: var(--accentSoft);
+  border-color: #ec6bb5;
+  background: #4a3545;
 }
 
 .site-link:focus-visible {
-  outline: 2px solid var(--white);
+  outline: 2px solid var(--appText);
   outline-offset: 2px;
 }
 
@@ -75,16 +78,16 @@ h1 {
   flex: 0 0 var(--markSize);
   place-items: center;
   border-radius: var(--markRadius);
-  color: var(--white);
-  background: var(--mark);
+  color: var(--appText);
+  background: #3a3a3a;
   font-size: var(--markFontSize);
   font-weight: 600;
 }
 
 .site-link:hover .site-mark,
 .site-link:focus-visible .site-mark {
-  color: var(--markHover);
-  background: var(--accent);
+  color: var(--appText);
+  background: #b4538c;
 }
 
 .site-copy {
@@ -106,7 +109,7 @@ h1 {
 }
 
 .site-host {
-  color: var(--muted);
+  color: var(--appTextMuted);
   font-size: var(--hostSize);
 }
 
@@ -116,6 +119,38 @@ h1 {
   margin-right: 3px;
   border-top: 1.5px solid currentColor;
   border-right: 1.5px solid currentColor;
-  color: var(--mark);
+  color: #ec6bb5;
   transform: rotate(45deg);
+}
+
+.update-info {
+  position: relative;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid #666;
+  border-radius: 50%;
+  color: var(--appTextMuted);
+  background: transparent;
+  font: 600 15px/1 var(--font-family), sans-serif;
+  cursor: pointer;
+}
+
+.update-info:hover,
+.update-info:focus-visible {
+  border-color: #ec6bb5;
+  color: var(--appText);
+  outline: none;
+}
+
+.update-badge:not([hidden]) {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--appSurface);
+  border-radius: 50%;
+  background: #ff5263;
 }
