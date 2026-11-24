@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import '../core/catalog.dart';
 import '../core/settings.dart';
 import '../core/updates.dart';
+import '../core/tv_remote.dart';
 import '../theme/theme.dart';
 import 'browser_page.dart';
 import 'history_page.dart';
 import 'library_page.dart';
 import 'search_page.dart';
 import 'settings_page.dart';
+import 'tv_remote_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key, required this.catalog, required this.settings});
@@ -23,6 +26,7 @@ class _HomePageState extends State<HomePage> {
   final _queries = ['', '', ''];
   final _search = TextEditingController();
   int _tab = 0;
+  int? _focusedSite;
 
   @override
   void dispose() {
@@ -35,9 +39,11 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     widget.settings.faviconRevision.addListener(_refreshFavicons);
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => checkForUpdates(context, manual: false),
-    );
+    if (!kDebugMode) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => checkForUpdates(context, manual: false),
+      );
+    }
   }
 
   void _refreshFavicons() {
@@ -92,6 +98,14 @@ class _HomePageState extends State<HomePage> {
           },
         ),
         actions: [
+          IconButton(
+            tooltip: TvRemoteLink.instance.isTv
+                ? 'จับคู่มือถือ'
+                : 'เชื่อมต่อ TV',
+            icon: Icon(TvRemoteLink.instance.isTv ? Icons.phonelink : Icons.tv),
+            onPressed: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const TvRemotePage())),
+          ),
           PopupMenuButton<String>(
             tooltip: 'More options',
             onSelected: (value) async {
@@ -167,11 +181,11 @@ class _HomePageState extends State<HomePage> {
 
   Widget _explore() => GridView.builder(
     padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
-    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: 3,
+    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: TvRemoteLink.instance.isTv ? 4 : 3,
       crossAxisSpacing: 14,
       mainAxisSpacing: 18,
-      childAspectRatio: .82,
+      childAspectRatio: TvRemoteLink.instance.isTv ? 1.15 : .82,
     ),
     itemCount: widget.catalog.sites.length,
     itemBuilder: (context, index) {
@@ -180,6 +194,18 @@ class _HomePageState extends State<HomePage> {
         button: true,
         label: '${site.name}, ${site.url.host}',
         child: InkWell(
+          autofocus: TvRemoteLink.instance.isTv && index == 0,
+          onFocusChange: (focused) {
+            if (TvRemoteLink.instance.isTv && mounted) {
+              setState(
+                () => _focusedSite = focused
+                    ? index
+                    : _focusedSite == index
+                    ? null
+                    : _focusedSite,
+              );
+            }
+          },
           key: ValueKey('site-${site.id}'),
           borderRadius: BorderRadius.circular(14),
           onTap: () => Navigator.of(context).push(
@@ -198,7 +224,12 @@ class _HomePageState extends State<HomePage> {
                   width: double.infinity,
                   decoration: BoxDecoration(
                     color: Palette.appSurface,
-                    border: Border.all(color: Palette.appTextMuted, width: 1.5),
+                    border: Border.all(
+                      color: _focusedSite == index
+                          ? Colors.white
+                          : Palette.appTextMuted,
+                      width: _focusedSite == index ? 4 : 1.5,
+                    ),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   alignment: Alignment.center,

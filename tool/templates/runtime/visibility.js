@@ -1,5 +1,6 @@
   const isVisible = function(button) {
-    if (!button.isConnected || button.hasAttribute("hidden") || button.disabled) {
+    if (!button.isConnected || button.hasAttribute("hidden") || button.disabled ||
+        button.getAttribute?.("aria-disabled") === "true") {
       return false;
     }
 

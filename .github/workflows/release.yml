@@ -1,4 +1,4 @@
-name: Android APK + Extension Release
+name: Android + Android TV + Extension Release
 
 on:
   push:
@@ -86,7 +86,7 @@ jobs:
               file.write(data)
           PY
 
-      - name: Build signed universal APK
+      - name: Build signed phone and Android TV APKs
         env:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/android-release.jks
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
@@ -94,9 +94,15 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
           RELEASE_BUILD_NUMBER: ${{ steps.version.outputs.build_number }}
-        run: flutter build apk --release --build-name="$RELEASE_VERSION" --build-number="$RELEASE_BUILD_NUMBER"
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          flutter build apk --release --build-name="$RELEASE_VERSION" --build-number="$RELEASE_BUILD_NUMBER"
+          cp build/app/outputs/flutter-apk/app-release.apk dist/universal.apk
+          flutter build apk --release --target-platform android-arm,android-arm64 --build-name="$RELEASE_VERSION" --build-number="$RELEASE_BUILD_NUMBER"
+          cp build/app/outputs/flutter-apk/app-release.apk dist/tv.apk
 
-      - name: Verify signed APK
+      - name: Verify signed APKs
         env:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/android-release.jks
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
@@ -105,18 +111,20 @@ jobs:
           RELEASE_BUILD_NUMBER: ${{ steps.version.outputs.build_number }}
         run: |
           set -euo pipefail
-          apk=build/app/outputs/flutter-apk/app-release.apk
-          test -s "$apk"
           build_tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
-          "$build_tools/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/apk-signing.txt" 2>&1
-          "$build_tools/aapt" dump badging "$apk" > "$RUNNER_TEMP/apk-badging.txt"
           keytool -exportcert -keystore "$ANDROID_KEYSTORE_PATH" \
             -storepass:env ANDROID_KEYSTORE_PASSWORD -alias "$ANDROID_KEY_ALIAS" \
             -file "$RUNNER_TEMP/android-signing-cert.der"
-          python3 -m tool.release.verify_release_apk "$apk" \
-            "$RUNNER_TEMP/android-signing-cert.der" \
-            "$RUNNER_TEMP/apk-signing.txt" "$RUNNER_TEMP/apk-badging.txt" \
-            "$RELEASE_VERSION" "$RELEASE_BUILD_NUMBER"
+          for target in universal tv; do
+            apk="dist/$target.apk"
+            test -s "$apk"
+            "$build_tools/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/apk-signing.txt" 2>&1
+            "$build_tools/aapt" dump badging "$apk" > "$RUNNER_TEMP/apk-badging.txt"
+            python3 -m tool.release.verify_release_apk "$apk" \
+              "$RUNNER_TEMP/android-signing-cert.der" \
+              "$RUNNER_TEMP/apk-signing.txt" "$RUNNER_TEMP/apk-badging.txt" \
+              "$RELEASE_VERSION" "$RELEASE_BUILD_NUMBER" "$target"
+          done
 
       - name: Package APK and Chrome extension
         env:
@@ -124,7 +132,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          cp build/app/outputs/flutter-apk/app-release.apk "dist/Movie.exe-$RELEASE_TAG.apk"
+          mv dist/universal.apk "dist/Movie.exe-$RELEASE_TAG.apk"
+          mv dist/tv.apk "dist/Movie.exe-TV-$RELEASE_TAG.apk"
           python3 -m tool.release.package_extension_zip extension "$RELEASE_TAG" "dist/Movie.exe-$RELEASE_TAG.zip"
           python3 - <<'PY'
           import os
@@ -132,7 +141,7 @@ jobs:
           import zipfile
           tag = os.environ["RELEASE_TAG"]
           files = list(Path("dist").iterdir())
-          expected = {f"Movie.exe-{tag}.apk", f"Movie.exe-{tag}.zip"}
+          expected = {f"Movie.exe-{tag}.apk", f"Movie.exe-TV-{tag}.apk", f"Movie.exe-{tag}.zip"}
           assert {item.name for item in files} == expected
           assert all(item.is_file() and item.stat().st_size for item in files)
           with zipfile.ZipFile(f"dist/Movie.exe-{tag}.zip") as archive:

@@ -7,7 +7,10 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/catalog.dart';
+import '../core/ad_blocking.dart';
 import '../core/settings.dart';
+import '../core/tv_remote.dart';
+import 'tv_remote_page.dart';
 
 enum BrowserLoadState { loading, loaded, failed }
 
@@ -34,7 +37,7 @@ class BrowserPage extends StatefulWidget {
   State<BrowserPage> createState() => _BrowserPageState();
 }
 
-class _BrowserPageState extends State<BrowserPage> {
+class _BrowserPageState extends State<BrowserPage> with RouteAware {
   static const _tapChannel = MethodChannel('mv/tap');
 
   InAppWebViewController? _controller;
@@ -44,6 +47,74 @@ class _BrowserPageState extends State<BrowserPage> {
   bool _canGoBack = false;
   bool _canGoForward = false;
   Timer? _loadTimeout;
+  PageRoute<dynamic>? _route;
+  Uri? _resumeUrl;
+  bool _playingOnTv = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute && route != _route) {
+      remoteRoutes.unsubscribe(this);
+      _route = route;
+      remoteRoutes.subscribe(this, route);
+    }
+  }
+
+  @override
+  void didPush() => _active(true);
+  @override
+  void didPopNext() => _active(true);
+  @override
+  void didPushNext() => _active(false);
+  @override
+  void didPop() => _active(false);
+
+  void _active(bool active) {
+    unawaited(TvRemoteLink.instance.browser(active));
+  }
+
+  void _loadState(BrowserLoadState state) {
+    if (TvRemoteLink.instance.isTv) {
+      TvRemoteLink.instance.loadState = state.name;
+    }
+    widget.onLoadStateChanged?.call(state);
+  }
+
+  Future<void> _sendToTv() async {
+    final link = TvRemoteLink.instance;
+    if (!link.connected) {
+      await Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const TvRemotePage()));
+    }
+    if (!mounted || !link.connected) return;
+    final url = await _controller?.getUrl();
+    if (url == null) return;
+    try {
+      validateRemoteCommand({
+        'action': 'open',
+        'url': url.toString(),
+      }, widget.catalog);
+      await link.send({'action': 'open', 'url': url.toString()});
+      if (mounted) {
+        // Disposing the source WebView stops media even inside cross-origin frames.
+        setState(() {
+          _resumeUrl = url.uriValue;
+          _playingOnTv = true;
+          _controller = null;
+          _progress = 1;
+        });
+        Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => const TvRemotePage()));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(remoteError(e))));
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -74,6 +145,7 @@ class _BrowserPageState extends State<BrowserPage> {
 
   @override
   void dispose() {
+    remoteRoutes.unsubscribe(this);
     _loadTimeout?.cancel();
     super.dispose();
   }
@@ -116,9 +188,53 @@ class _BrowserPageState extends State<BrowserPage> {
         }
       },
       child: Scaffold(
+        bottomNavigationBar: TvRemoteLink.instance.isTv
+            ? SafeArea(
+                child: Row(
+                  children: [
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Text(
+                        'ลูกศรขยับ · OK คลิก · Menu สลับเคอร์เซอร์',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'เลื่อนหน้าขึ้น',
+                      onPressed: () =>
+                          TvRemoteLink.instance.input({'action': 'scrollUp'}),
+                      icon: const Icon(Icons.vertical_align_top),
+                    ),
+                    IconButton(
+                      tooltip: 'เลื่อนหน้าลง',
+                      onPressed: () =>
+                          TvRemoteLink.instance.input({'action': 'scrollDown'}),
+                      icon: const Icon(Icons.vertical_align_bottom),
+                    ),
+                  ],
+                ),
+              )
+            : null,
         appBar: AppBar(
           title: Text(widget.site.name),
           actions: [
+            if (TvRemoteLink.instance.isTv)
+              IconButton(
+                tooltip: 'สลับเคอร์เซอร์ / เลือกปุ่ม (Menu บนรีโมต)',
+                icon: const Icon(Icons.mouse_outlined),
+                onPressed: () =>
+                    TvRemoteLink.instance.input({'action': 'cursor'}),
+              )
+            else
+              IconButton(
+                tooltip: _playingOnTv ? 'ควบคุม TV' : 'เปิดบน TV',
+                icon: const Icon(Icons.tv),
+                onPressed: _playingOnTv
+                    ? () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const TvRemotePage()),
+                      )
+                    : _sendToTv,
+              ),
             IconButton(
               tooltip: 'Back',
               icon: const Icon(Icons.arrow_back),
@@ -140,7 +256,8 @@ class _BrowserPageState extends State<BrowserPage> {
             IconButton(
               tooltip: 'Home',
               icon: const Icon(Icons.home),
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () =>
+                  Navigator.of(context).popUntil((route) => route.isFirst),
             ),
             PopupMenuButton<String>(
               tooltip: 'Save page',
@@ -167,25 +284,54 @@ class _BrowserPageState extends State<BrowserPage> {
                 )
               : null,
         ),
-        body: script == null
+        body: _playingOnTv
+            ? Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.tv, size: 64),
+                    const SizedBox(height: 16),
+                    const Text('เปิดบน TV แล้ว หยุดเล่นบนมือถือแล้ว'),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const TvRemotePage()),
+                      ),
+                      icon: const Icon(Icons.settings_remote),
+                      label: const Text('ควบคุม TV'),
+                    ),
+                    TextButton(
+                      onPressed: () => setState(() {
+                        _playingOnTv = false;
+                        _progress = 0;
+                        _error = null;
+                      }),
+                      child: const Text('เปิดหน้านี้บนมือถืออีกครั้ง'),
+                    ),
+                  ],
+                ),
+              )
+            : script == null
             ? const Center(child: CircularProgressIndicator())
             : Stack(
                 children: [
                   InAppWebView(
                     initialUrlRequest: URLRequest(
                       url: WebUri.uri(
-                        widget.initialUrl != null &&
+                        (_resumeUrl ?? widget.initialUrl) != null &&
                                 decideNavigation(
-                                      widget.initialUrl!,
+                                      (_resumeUrl ?? widget.initialUrl)!,
                                       widget.catalog,
                                     ) ==
                                     NavDecision.allowInApp
-                            ? widget.initialUrl!
+                            ? (_resumeUrl ?? widget.initialUrl)!
                             : widget.site.url,
                       ),
                     ),
                     initialUserScripts: UnmodifiableListView([script]),
                     initialSettings: InAppWebViewSettings(
+                      useShouldInterceptRequest:
+                          widget.settings.blockAdsEnabled,
                       javaScriptEnabled: true,
                       mediaPlaybackRequiresUserGesture: false,
                       allowsInlineMediaPlayback: true,
@@ -200,6 +346,20 @@ class _BrowserPageState extends State<BrowserPage> {
                         handlerName: 'mvTap',
                         callback: (args) => _nativeTap(args),
                       );
+                    },
+                    shouldInterceptRequest: (_, request) async {
+                      if (widget.settings.blockAdsEnabled &&
+                          request.isForMainFrame != true &&
+                          isBlockedAdUri(request.url.uriValue)) {
+                        return WebResourceResponse(
+                          contentType: 'text/plain',
+                          contentEncoding: 'utf-8',
+                          statusCode: 204,
+                          reasonPhrase: 'No Content',
+                          data: Uint8List(0),
+                        );
+                      }
+                      return null;
                     },
                     onReceivedIcon: (_, icon) =>
                         widget.settings.saveFavicon(widget.site.id, icon),
@@ -220,14 +380,12 @@ class _BrowserPageState extends State<BrowserPage> {
                         _loadTimeout = Timer(timeout, () {
                           if (!mounted) return;
                           setState(() => _error = 'Timed out');
-                          widget.onLoadStateChanged?.call(
-                            BrowserLoadState.failed,
-                          );
+                          _loadState(BrowserLoadState.failed);
                           _controller?.stopLoading();
                         });
                       }
                       setState(() => _error = null);
-                      widget.onLoadStateChanged?.call(BrowserLoadState.loading);
+                      _loadState(BrowserLoadState.loading);
                     },
                     onProgressChanged: (c, p) =>
                         setState(() => _progress = p / 100),
@@ -237,7 +395,7 @@ class _BrowserPageState extends State<BrowserPage> {
                       await c.evaluateJavascript(source: script.source);
                       await _refreshNavState();
                       final uri = url?.uriValue;
-                      widget.onLoadStateChanged?.call(
+                      _loadState(
                         _error == null
                             ? BrowserLoadState.loaded
                             : BrowserLoadState.failed,
@@ -260,9 +418,7 @@ class _BrowserPageState extends State<BrowserPage> {
                       if (request.isForMainFrame ?? false) {
                         _loadTimeout?.cancel();
                         setState(() => _error = error.description);
-                        widget.onLoadStateChanged?.call(
-                          BrowserLoadState.failed,
-                        );
+                        _loadState(BrowserLoadState.failed);
                       }
                     },
                     onReceivedHttpError: (c, request, response) {
@@ -270,9 +426,7 @@ class _BrowserPageState extends State<BrowserPage> {
                           (response.statusCode ?? 0) >= 400) {
                         _loadTimeout?.cancel();
                         setState(() => _error = 'HTTP ${response.statusCode}');
-                        widget.onLoadStateChanged?.call(
-                          BrowserLoadState.failed,
-                        );
+                        _loadState(BrowserLoadState.failed);
                       }
                     },
                     // Default behavior cancels on TLS errors; never proceed.
@@ -338,24 +492,32 @@ class _BrowserPageState extends State<BrowserPage> {
   }
 
   // Only taps requested by an allowlisted page are forwarded to native input.
-  Future<void> _nativeTap(List<dynamic> args) async {
-    if (args.length < 3 || args.any((a) => a is! num)) return;
+  Future<bool> _nativeTap(List<dynamic> args) async {
+    if (args.length != 3 || args.any((a) => a is! num || !a.isFinite)) {
+      return false;
+    }
     final url = await _controller?.getUrl();
     final host = url?.host ?? '';
-    if (!widget.catalog.isAllowedHost(host)) return;
-    await _tapChannel.invokeMethod('tap', {
-      'x': (args[0] as num).toDouble(),
-      'y': (args[1] as num).toDouble(),
-      'viewportWidth': (args[2] as num).toDouble(),
-    });
+    if (!widget.catalog.isAllowedHost(host)) return false;
+    return await _tapChannel.invokeMethod<bool>('tap', {
+          'x': (args[0] as num).toDouble(),
+          'y': (args[1] as num).toDouble(),
+          'viewportWidth': (args[2] as num).toDouble(),
+        }) ==
+        true;
   }
 
   Future<void> _setFullscreen(bool on) async {
+    if (TvRemoteLink.instance.isTv) {
+      await TvRemoteLink.channel.invokeMethod('fullscreen', {'active': on});
+    }
     await SystemChrome.setEnabledSystemUIMode(
       on ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
     );
     await SystemChrome.setPreferredOrientations(
       on
+          ? [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]
+          : TvRemoteLink.instance.isTv
           ? [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]
           : DeviceOrientation.values,
     );

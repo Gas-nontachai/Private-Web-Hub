@@ -29,6 +29,7 @@ class ReleaseNotesTests(unittest.TestCase):
         self.assertIn("No user-facing change details are provided", notes)
         self.assertNotIn("### Added", notes)
         self.assertIn("Movie.exe-v1.2.0.apk", notes)
+        self.assertIn("Movie.exe-TV-v1.2.0.apk", notes)
         self.assertIn("Movie.exe-v1.2.0.zip", notes)
 
     def test_invalid_or_non_prior_tags_are_rejected(self):

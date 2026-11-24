@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/catalog.dart';
 import '../core/settings.dart';
+import '../core/tv_remote.dart';
 import '../theme/theme.dart';
 import 'browser_page.dart';
 
@@ -117,7 +118,11 @@ class _LibraryPageState extends State<LibraryPage> {
           )
         : LayoutBuilder(
             builder: (context, constraints) {
-              final columns = constraints.maxWidth > 600 ? 3 : 2;
+              final columns = TvRemoteLink.instance.isTv
+                  ? 5
+                  : constraints.maxWidth > 600
+                  ? 3
+                  : 2;
               const spacing = 12.0;
               final width =
                   (constraints.maxWidth - 32 - spacing * (columns - 1)) /

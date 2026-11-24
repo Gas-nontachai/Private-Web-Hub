@@ -8,6 +8,13 @@ Movie.exe brings supported movie and series websites together in one place, avai
 
 [Download ${APK_FILENAME}](${APK_URL})
 
+### Android TV
+
+[Download ${TV_APK_FILENAME}](${TV_APK_URL})
+
+For ARM Android TV / Google TV (32-bit and 64-bit). Install on TV and open Movie.exe.
+Use the TV remote alone, or pair an Android phone on the same Wi-Fi from the app.
+
 ### Chrome Extension
 
 [Download ${ZIP_FILENAME}](${ZIP_URL})

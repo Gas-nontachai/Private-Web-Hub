@@ -75,12 +75,13 @@ def outputs(root=ROOT):
         raise ValueError('Expected the global skip-button rule')
     selectors = [s for action in globals_[0]['actions'] for s in action['selectors']]
     if globals_[0].get('enabled', True):
-        scripts.append({'matches': ['https://*/*', 'http://*/*'], 'js': ['content/adgate-skip-global.js'], 'run_at': 'document_start', 'all_frames': True})
+        scripts.append({'matches': ['https://*/*', 'http://*/*'], 'js': ['content/adgate-skip-global.js'], 'run_at': 'document_start', 'all_frames': True, 'world': 'MAIN'})
     manifest['content_scripts'] = scripts
     put('extension/manifest.json', json.dumps(manifest, indent=2) + '\n')
     visibility = (root / 'tool/templates/runtime/visibility.js').read_text()
+    skip_targets = (root / 'tool/templates/runtime/skip_targets.js').read_text()
     for template, destination in [('rule_runtime.js.in', 'assets/runtime/rule_runtime.js'), ('adgate-skip-global.js.in', 'extension/content/adgate-skip-global.js')]:
-        text = (root / 'tool/templates/runtime' / template).read_text().replace('__VISIBILITY__', visibility)
+        text = (root / 'tool/templates/runtime' / template).read_text().replace('__VISIBILITY__', visibility).replace('__SKIP_TARGETS__', skip_targets)
         if template.startswith('adgate'):
             text = text.replace('__SKIP_SELECTOR__', json.dumps(','.join(selectors)))
         put(destination, HEADER + text)

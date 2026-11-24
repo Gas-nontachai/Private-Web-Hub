@@ -51,6 +51,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        resValue("string", "app_name", "Movie.exe")
     }
 
     signingConfigs {
@@ -63,6 +64,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".tvpreview"
+            resValue("string", "app_name", "Movie.exe TV Preview")
+        }
         release {
             signingConfig = signingConfigs.getByName("release")
         }

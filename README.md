@@ -52,10 +52,11 @@ then run the generator instead of editing generated files directly.
 ## Release
 
 The existing [release workflow](.github/workflows/release.yml) builds and publishes
-**Movie.exe vX.Y.Z** to GitHub Releases in `Gas-nontachai/Private-Web-Hub`, with exactly two uploaded assets:
+**Movie.exe vX.Y.Z** to GitHub Releases in `Gas-nontachai/Private-Web-Hub`, with exactly three uploaded assets:
 
 ```text
 Movie.exe-v1.0.1.apk
+Movie.exe-TV-v1.0.1.apk
 Movie.exe-v1.0.1.zip
 ```
 
@@ -119,8 +120,12 @@ Load unpacked and do not require a Chrome private signing key.
 
 - Android uses the existing stable-channel Flutter setup and Gradle signing
   configuration. `flutter build apk --release --build-name=X.Y.Z --build-number=N` produces one
-  universal APK with `armeabi-v7a`, `arm64-v8a` and `x86_64`. The workflow verifies
-  its signature with `apksigner`, compares the certificate to the configured
+  universal APK with `armeabi-v7a`, `arm64-v8a` and `x86_64`. A second build with
+  `--target-platform android-arm,android-arm64` produces the TV APK, retaining
+  32-bit ARM support for devices such as MiTV-MOSR4. Both APKs use the same
+  application ID, version and release certificate, and detect TV mode at runtime.
+  Install one APK per device. The workflow verifies
+  both signatures with `apksigner`, compares the certificate to the configured
   keystore alias, and checks the display name, application ID and version.
 - The Chrome extension is packaged directly from the bundled [extension](extension/)
   directory in this repository, at the tagged commit. No secondary repository or
@@ -130,7 +135,7 @@ Load unpacked and do not require a Chrome private signing key.
   excludes signing material and places manifest.json at the ZIP root.
   Download the ZIP, extract it, enable Developer Mode at chrome://extensions,
   then choose Load unpacked and select the extracted folder.
-- APK and extension ZIP builds must both succeed before release creation. The release
+- Both Android APK builds and the extension ZIP must succeed before release creation. The release
   job has `contents: write`. Both uploaded asset names are checked locally before
   publication. Existing releases are never overwritten. Inspect any partial release
   after a failed upload before deliberately removing it and rerunning.
@@ -194,7 +199,7 @@ Flutter and CSS keep their platform-specific layout, using generated constants a
 CSS variables for shared values. No runtime fetch of shared config is required.
 
 CRX signing/packaging is removed. APK plus extension ZIP are the supported outputs.
-The release workflow creates a public release after both artifacts are validated;
+The release workflow creates a public release after all three artifacts are validated;
 it refuses to overwrite an existing release. The earlier draft-release and download
 retry descriptions do not apply to the current workflow.
 
@@ -208,3 +213,65 @@ flutter analyze
 flutter test
 flutter build apk --debug
 ```
+
+## Android TV and phone remote
+
+The same app supports Android phones and Android TV / Google TV. TV mode is
+detected from Android device features, not the screen width. Install the TV APK
+from Releases for ARM TVs; the universal APK also supports x86_64.
+
+1. Open Movie.exe on TV. Select the phone icon (**จับคู่มือถือ**) to display a
+   six-digit pairing code (valid for two minutes), local address and identity number.
+2. On an Android phone on the same Wi-Fi, select **เชื่อมต่อ TV**. Pick the TV
+   or enter its IP address (port 47831). Choose pairing when prompted.
+3. Compare the identity number on both screens, enter the six-digit code, and
+   approve on TV only if the identity numbers match. Pairing replaces the previous
+   controller; TV can revoke it from the same page.
+4. Open a supported page on the phone and select **เปิดบน TV**. TV loads the URL
+   itself, with its own cookies and website storage. After TV accepts the URL, the
+   source WebView on the phone is disposed to stop playback in all frames. The phone
+   becomes a remote; use the touchpad to move the TV cursor and tap to click.
+   Returning to the phone page shows a receipt and an explicit button to reopen it
+   locally. Failed handoffs keep the original phone page running.
+
+The TV remote works independently: arrows move the cursor inside web pages, OK
+clicks, Menu switches between cursor and app focus, and Channel/Page Up/Down scroll.
+The cursor hides after three seconds of inactivity and reappears on movement or click.
+The browser toolbar also provides cursor switching and scrolling. Back exits
+fullscreen first, then follows web history and returns to the app. The phone has
+the same navigation, click, scroll and cursor controls.
+
+Open the TV app before connecting. Leaving the app closes the receiver; losing
+the phone connection does not stop playback. Reconnect explicitly after a network
+change; commands are not replayed. Discovery can be blocked by guest Wi-Fi or AP
+isolation; IP entry cannot bypass network isolation. Local-network permission
+is requested when required by the OS and target SDK.
+
+Pairing uses TLS with a TV certificate held in Android Keystore. Compare the
+identity numbers during the first pairing; subsequent connections pin that
+certificate. Pairing credentials are encrypted using a Keystore key and excluded
+from backups. No accounts, cloud service, casting, remote JavaScript, cookie
+transfer or playback-position sync are included.
+
+`flutter build apk --debug` creates **Movie.exe TV Preview** with application ID
+`com.nonthachai.privatewebhub.tvpreview`, which installs alongside the release app
+and keeps separate settings. CI uploads this preview APK as a downloadable artifact.
+Release APKs retain the original application ID and signing configuration.
+
+### Ad blocking and skip controls
+
+The Android app blocks resource requests to a small bundled set of known ad-network
+hosts before loading them. This is not the AdBlock extension or a full EasyList
+engine. **Settings → บล็อกการโหลดโฆษณา** controls this independently from automatic
+skipping; reopen the page after changing it. Main documents, catalog sites and
+normal media CDNs are not blocked by these host rules.
+
+Skip targets include the original ad-gate button and ready JW Player skip controls.
+Exact Thai/English skip labels are considered only inside active ad-player
+containers. Chrome runs the reviewed skip script in the page's MAIN world so it
+can use JW Player's public `skipAd()` API; other controls retain DOM clicks. The
+WebView runtime instead requests native touchscreen events, validates visible
+viewport coordinates, and relays acknowledgements through scaled iframe borders.
+Off-screen or unavailable bridge attempts do not consume the retry budget; each
+new visible ad resets it. Changes belong in the catalog and runtime templates;
+run `python3 tool/generate_shared.py` to update both platform outputs.

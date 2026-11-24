@@ -1,8 +1,10 @@
 (() => {
   const skipButtonSelector = __SKIP_SELECTOR__;
   const clickedButtons = new WeakSet();
+  let previousButtons = new Set();
 
 __VISIBILITY__
+__SKIP_TARGETS__
   function resetDetachedButtons(node) {
     if (!(node instanceof Element)) {
       return;
@@ -19,7 +21,12 @@ __VISIBILITY__
   }
 
   function checkSkipButtons() {
-    for (const button of document.querySelectorAll(skipButtonSelector)) {
+    const buttons = new Set(findSkipButtons(skipButtonSelector));
+    for (const button of previousButtons) {
+      if (!buttons.has(button)) clickedButtons.delete(button);
+    }
+    previousButtons = buttons;
+    for (const button of buttons) {
       if (!isVisible(button)) {
         clickedButtons.delete(button);
         continue;
@@ -27,7 +34,12 @@ __VISIBILITY__
 
       if (!clickedButtons.has(button)) {
         clickedButtons.add(button);
-        button.click();
+        try {
+          const container = button.closest?.('.jwplayer.jw-flag-ads');
+          const player = container && typeof window.jwplayer === 'function' ? window.jwplayer(container.id) : null;
+          if (typeof player?.skipAd === 'function') player.skipAd();
+          else button.click();
+        } catch (_) { button.click(); }
       }
     }
   }
@@ -38,7 +50,6 @@ __VISIBILITY__
         mutation.type === "attributes" &&
         mutation.attributeName === "hidden" &&
         mutation.target instanceof Element &&
-        mutation.target.matches(skipButtonSelector) &&
         (mutation.oldValue !== null || mutation.target.hasAttribute("hidden"))
       ) {
         clickedButtons.delete(mutation.target);

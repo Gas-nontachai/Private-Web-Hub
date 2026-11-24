@@ -66,6 +66,8 @@ def render_notes(tag: str, prior_tag: str | None = None) -> str:
         "APK_FILENAME": apk_filename,
         "ZIP_FILENAME": zip_filename,
         "APK_URL": f"{release_url}/{apk_filename}",
+        "TV_APK_FILENAME": f"Movie.exe-TV-{tag}.apk",
+        "TV_APK_URL": f"{release_url}/Movie.exe-TV-{tag}.apk",
         "ZIP_URL": f"{release_url}/{zip_filename}",
         "CHANGES": changes,
         "CHANGELOG_URL": changelog_url,
