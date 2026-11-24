@@ -101,6 +101,18 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 10),
           _group([
             SwitchListTile(
+              key: const ValueKey('toggle-block-ads'),
+              secondary: const Icon(Icons.block),
+              title: const Text('บล็อกการโหลดโฆษณา'),
+              subtitle: const Text('บล็อกเครือข่ายโฆษณาที่รู้จัก · ปิดแล้วเปิดหน้าเว็บใหม่หากวิดีโอโหลดไม่ได้'),
+              value: widget.settings.blockAdsEnabled,
+              onChanged: (value) async {
+                await widget.settings.setBlockAdsEnabled(value);
+                if (mounted) setState(() {});
+              },
+            ),
+            const Divider(height: 1, indent: 72),
+            SwitchListTile(
               key: const ValueKey('toggle-global'),
               secondary: const Icon(Icons.auto_awesome_outlined),
               title: const Text('All sites'),

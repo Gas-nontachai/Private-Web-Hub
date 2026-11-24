@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'design_tokens.dart';
 export 'design_tokens.dart';
 
-ThemeData buildTheme() {
+ThemeData buildTheme({bool isTv = false}) {
   final scheme =
       ColorScheme.fromSeed(
         seedColor: Palette.appSurface,
@@ -20,6 +20,11 @@ ThemeData buildTheme() {
     useMaterial3: true,
     fontFamily: Design.fontFamily,
     colorScheme: scheme,
+    focusColor: isTv ? Colors.white.withValues(alpha: .3) : null,
+    visualDensity: isTv ? VisualDensity.comfortable : null,
+    listTileTheme: ListTileThemeData(
+      selectedTileColor: Palette.appSurfaceActive,
+    ),
     scaffoldBackgroundColor: Palette.appBackground,
     appBarTheme: const AppBarTheme(
       backgroundColor: Palette.appBackground,

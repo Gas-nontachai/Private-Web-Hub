@@ -6,7 +6,9 @@ import sys
 import zipfile
 
 
-def validate(apk_file, cert_file, signing_file, badging_file, version, build_number):
+def validate(apk_file, cert_file, signing_file, badging_file, version, build_number, target="universal"):
+    if target not in ("universal", "tv"):
+        raise ValueError("Expected universal or tv target")
     apk_file = Path(apk_file)
     if not apk_file.is_file() or apk_file.stat().st_size == 0:
         raise ValueError(f"Missing or empty APK: {apk_file}")
@@ -60,11 +62,19 @@ def validate(apk_file, cert_file, signing_file, badging_file, version, build_num
 
     with zipfile.ZipFile(apk_file) as apk:
         names = set(apk.namelist())
-        for abi in ("armeabi-v7a", "arm64-v8a", "x86_64"):
+        for abi in (("armeabi-v7a", "arm64-v8a") if target == "tv" else ("armeabi-v7a", "arm64-v8a", "x86_64")):
             candidate = f"lib/{abi}/libflutter.so"
             if candidate not in names:
                 raise ValueError(f"Universal APK is missing ABI library {candidate}")
-    print("OK: APK contains all three Flutter ABI libraries")
+    print(f"OK: APK contains required {target} Flutter ABI libraries")
+    if target == "tv":
+        if "leanback-launchable-activity" not in badging:
+            raise ValueError("TV APK is missing the Leanback launcher")
+        if "application: " not in badging or "banner=" not in badging:
+            raise ValueError("TV APK is missing a launcher banner")
+        if "uses-feature: name='android.hardware.touchscreen'" in badging:
+            raise ValueError("TV APK must not require a touchscreen")
+        print("OK: TV launcher, banner and optional touchscreen")
 
 
 if __name__ == "__main__":

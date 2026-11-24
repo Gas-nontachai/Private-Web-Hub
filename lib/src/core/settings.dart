@@ -172,6 +172,9 @@ class SiteSettings {
       _prefs.getBool('rules_enabled_${site.id}') ?? site.enabled;
 
   bool get globalEnabled => _prefs.getBool('rules_enabled_global') ?? true;
+  bool get blockAdsEnabled => _prefs.getBool('block_ads_enabled') ?? true;
+
+  Future<void> setBlockAdsEnabled(bool value) => _prefs.setBool('block_ads_enabled', value);
 
   Future<void> setGlobalEnabled(bool value) =>
       _prefs.setBool('rules_enabled_global', value);

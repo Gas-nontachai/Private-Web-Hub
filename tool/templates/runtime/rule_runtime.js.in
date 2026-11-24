@@ -30,44 +30,64 @@
     }
   }
 
-  // Relays a child frame's tap target up to the top frame with offsets applied.
-  const relay = (rect) => {
+  const pendingTaps = new Map();
+  let tapId = 0;
+  const validRect = (r) => r && [r.x, r.y, r.w, r.h].every(Number.isFinite) && r.w > 0 && r.h > 0;
+  const inViewport = (r, width = window.innerWidth, height = window.innerHeight) =>
+    validRect(r) && r.x + r.w / 2 >= 0 && r.y + r.h / 2 >= 0 &&
+    r.x + r.w / 2 < width && r.y + r.h / 2 < height;
+
+  // Every parent checks visibility and transforms coordinates before acknowledging a real tap.
+  const relay = async (rect) => {
+    if (!inViewport(rect)) return false;
     if (window === window.top) {
       const handler = window.flutter_inappwebview;
-      if (handler && handler.callHandler) {
-        handler.callHandler(
-          "mvTap",
-          rect.x + rect.w / 2,
-          rect.y + rect.h / 2,
-          window.innerWidth
-        );
-      }
-    } else {
-      window.parent.postMessage({ __mvTap: true, rect }, "*");
+      if (!handler || typeof handler.callHandler !== 'function') return false;
+      try {
+        return await handler.callHandler("mvTap", rect.x + rect.w / 2, rect.y + rect.h / 2, window.innerWidth) === true;
+      } catch (_) { return false; }
     }
+    const id = ++tapId;
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => { pendingTaps.delete(id); resolve(false); }, 2000);
+      pendingTaps.set(id, (ok) => { clearTimeout(timer); resolve(ok); });
+      window.parent.postMessage({ __mvTap: true, id, rect, width: window.innerWidth, height: window.innerHeight }, '*');
+    });
   };
 
   if (!state.listening) {
     state.listening = true;
-    window.addEventListener("message", (e) => {
+    window.addEventListener('message', async (e) => {
       const d = e.data;
-      if (!d || d.__mvTap !== true || !d.rect) return;
-      let originHost = "";
-      try {
-        originHost = new URL(e.origin).hostname;
-      } catch (_) {}
-      if (!tapHosts.has("*") && !tapHosts.has(originHost)) return;
-      for (const f of document.querySelectorAll("iframe")) {
-        if (f.contentWindow === e.source) {
-          const fr = f.getBoundingClientRect();
-          relay({
-            x: fr.left + f.clientLeft + d.rect.x,
-            y: fr.top + f.clientTop + d.rect.y,
-            w: d.rect.w,
-            h: d.rect.h,
-          });
-          return;
+      if (!d) return;
+      if (d.__mvTapResult === true && e.source === window.parent) {
+        const done = pendingTaps.get(d.id);
+        if (done) { pendingTaps.delete(d.id); done(d.ok === true); }
+        return;
+      }
+      if (d.__mvTap !== true || !Number.isInteger(d.id) || !validRect(d.rect) ||
+          !Number.isFinite(d.width) || !Number.isFinite(d.height) || d.width <= 0 || d.height <= 0) return;
+      let originHost = '';
+      try { originHost = new URL(e.origin).hostname; } catch (_) {}
+      if (!tapHosts.has('*') && !tapHosts.has(originHost)) return;
+      for (const frame of document.querySelectorAll('iframe')) {
+        if (frame.contentWindow !== e.source) continue;
+        let ok = false;
+        if (isVisible(frame) && inViewport(d.rect, d.width, d.height)) {
+          const bounds = frame.getBoundingClientRect();
+          const scaleX = bounds.width / frame.offsetWidth;
+          const scaleY = bounds.height / frame.offsetHeight;
+          const rect = {
+            x: bounds.left + (frame.clientLeft + d.rect.x * frame.clientWidth / d.width) * scaleX,
+            y: bounds.top + (frame.clientTop + d.rect.y * frame.clientHeight / d.height) * scaleY,
+            w: d.rect.w * frame.clientWidth / d.width * scaleX,
+            h: d.rect.h * frame.clientHeight / d.height * scaleY,
+          };
+          const hit = document.elementFromPoint(rect.x + rect.w / 2, rect.y + rect.h / 2);
+          if (hit === frame) ok = await relay(rect);
         }
+        e.source.postMessage({ __mvTapResult: true, id: d.id, ok }, e.origin === 'null' ? '*' : e.origin);
+        return;
       }
     });
   }
@@ -83,6 +103,7 @@
   };
 
 __VISIBILITY__
+__SKIP_TARGETS__
   for (const rule of active) {
     for (const action of rule.actions) {
       const selectors = (action.selectors || []).filter(validSelector);
@@ -135,21 +156,22 @@ __VISIBILITY__
         // Some players ignore synthetic clicks (isTrusted), so ask the host app for a real tap.
         const key = rule.id;
         if (state.observers[key]) continue;
+        let target = null;
         let taps = 0;
-        const MAX_TAPS = 12;
-        const timer = setInterval(() => {
-          if (taps >= MAX_TAPS) return clearInterval(timer);
-          for (const sel of selectors) {
-            const el = document.querySelector(sel);
-            if (el && isVisible(el)) {
-              const r = el.getBoundingClientRect();
-              if (r.width > 0 && r.height > 0) {
-                taps++;
-                relay({ x: r.left, y: r.top, w: r.width, h: r.height });
-              }
-              return;
-            }
-          }
+        let busy = false;
+        const timer = setInterval(async () => {
+          if (busy) return;
+          const el = findSkipButtons(selectors.join(',')).find(isVisible);
+          if (el !== target) { target = el; taps = 0; }
+          if (!el || taps >= 12) return;
+          const bounds = el.getBoundingClientRect();
+          const rect = { x: bounds.left, y: bounds.top, w: bounds.width, h: bounds.height };
+          if (!inViewport(rect)) return;
+          const hit = document.elementFromPoint(rect.x + rect.w / 2, rect.y + rect.h / 2);
+          if (hit !== el && !el.contains(hit)) return;
+          busy = true;
+          try { if (await relay(rect)) taps++; }
+          finally { busy = false; }
         }, 1500);
         state.observers[key] = { disconnect: () => clearInterval(timer) };
       } else if (action.type === "clickWhenVisible") {

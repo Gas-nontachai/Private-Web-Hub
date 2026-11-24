@@ -143,7 +143,8 @@
         {
           "type": "tapWhenVisible",
           "selectors": [
-            "button#adgate-skip"
+            "button#adgate-skip",
+            ".jw-skip.jw-skippable"
           ]
         }
       ]
