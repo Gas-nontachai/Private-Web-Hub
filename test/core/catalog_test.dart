@@ -13,6 +13,7 @@ void main() {
       'SerieDay',
       '037HDD',
       'GoSeries4K',
+      'Movie2FreeHD',
       'AnimeRuka',
     ]);
     expect(c.sites.map((s) => s.id).toSet().length, c.sites.length);
@@ -21,6 +22,7 @@ void main() {
       'หนัง/ซีรี่ย์',
       'หนัง/ซีรี่ย์',
       'หนัง/ซีรี่ย์',
+      'หนัง',
       'อนิเมะ',
     ]);
   });
@@ -45,6 +47,13 @@ void main() {
         'test',
       ).toString(),
       'https://www.goseries4k.com/?s=test',
+    );
+    expect(
+      buildSearchUri(
+        c.sites.singleWhere((s) => s.id == 'movie2freehd'),
+        'test',
+      ).toString(),
+      'https://movie2freehd.com/?s=test',
     );
     expect(
       buildSearchUri(

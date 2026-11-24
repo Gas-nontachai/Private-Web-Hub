@@ -49,6 +49,16 @@ Keep platform directories in their standard locations; generated runtime assets
 stay beside the platform that consumes them. Edit their source JSON/templates,
 then run the generator instead of editing generated files directly.
 
+## In-app Android updates
+
+Home checks GitHub Releases outside debug builds; Settings also offers a manual check.
+Updates download inside the app with percentage/byte progress, Cancel and Retry.
+TV devices select the TV APK. When complete, the app opens Android's installer.
+On Android 8+, allow installs from this app when prompted, then return and press
+Install. Android still requires installation confirmation and verifies the APK's
+signature. Downloads use app cache; incomplete downloads are removed. Closing the
+dialog cancels an active download; downloads do not resume after an app restart.
+
 ## Release
 
 The existing [release workflow](.github/workflows/release.yml) builds and publishes

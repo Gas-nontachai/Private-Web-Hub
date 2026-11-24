@@ -57,6 +57,17 @@
     },
     {
       "matches": [
+        "https://movie2freehd.com/*",
+        "http://movie2freehd.com/*"
+      ],
+      "css": [
+        "rules/movie2freehd.css"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
         "https://animeruka.com/*",
         "http://animeruka.com/*"
       ],

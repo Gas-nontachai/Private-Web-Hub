@@ -1,6 +1,12 @@
 package com.nonthachai.privatewebhub
 
 import android.os.SystemClock
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import androidx.core.content.FileProvider
+import java.io.File
 import android.view.MotionEvent
 import android.view.KeyEvent
 import android.view.InputDevice
@@ -73,8 +79,33 @@ class MainActivity : FlutterActivity() {
         }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "mv/app")
             .setMethodCallHandler { call, result ->
-                if (call.method == "version") result.success(packageManager.getPackageInfo(packageName, 0).versionName)
-                else result.notImplemented()
+                try {
+                    when (call.method) {
+                        "version" -> result.success(packageManager.getPackageInfo(packageName, 0).versionName)
+                        "updatePath" -> {
+                            val directory = File(cacheDir, "updates").apply { mkdirs() }
+                            result.success(File(directory, "update.apk").absolutePath)
+                        }
+                        "installUpdate" -> {
+                            val apk = File(cacheDir, "updates/update.apk")
+                            check(apk.isFile && apk.length() > 0) { "Downloaded APK is missing" }
+                            val info = packageManager.getPackageArchiveInfo(apk.absolutePath, 0)
+                            check(info?.packageName == packageName) { "APK does not match this app" }
+                            if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
+                                startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+                                result.success(false)
+                            } else {
+                                val uri = FileProvider.getUriForFile(this, "$packageName.updates", apk)
+                                startActivity(Intent(Intent.ACTION_VIEW).apply {
+                                    setDataAndType(uri, "application/vnd.android.package-archive")
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                })
+                                result.success(true)
+                            }
+                        }
+                        else -> result.notImplemented()
+                    }
+                } catch (e: Exception) { result.error("update", e.message, null) }
             }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "mv/tap")
             .setMethodCallHandler { call, result ->
