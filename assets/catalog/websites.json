@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "2026.11.08",
+  "version": "2026.11.24",
   "sites": [
     {
       "id": "serieday",
@@ -97,6 +97,19 @@
           ]
         }
       ]
+    },
+    {
+      "id": "movie2freehd",
+      "name": "Movie2FreeHD",
+      "category": "หนัง",
+      "mark": "M2F",
+      "url": "https://movie2freehd.com/",
+      "hosts": [
+        "movie2freehd.com"
+      ],
+      "search": { "path": "/", "queryKey": "s" },
+      "enabled": true,
+      "rules": []
     },
     {
       "id": "animeruka",

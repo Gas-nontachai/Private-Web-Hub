@@ -16,6 +16,11 @@ const websites = [
     "mark": "G4K"
   },
   {
+    "name": "Movie2FreeHD",
+    "url": "https://movie2freehd.com/",
+    "mark": "M2F"
+  },
+  {
     "name": "AnimeRuka",
     "url": "https://animeruka.com/",
     "mark": "AR"
