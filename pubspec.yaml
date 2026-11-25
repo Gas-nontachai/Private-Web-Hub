@@ -23,6 +23,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/catalog/websites.json
+    - assets/runtime/media_runtime.js
     - assets/runtime/rule_runtime.js
     - assets/adguard/
     - assets/adguard/licenses/

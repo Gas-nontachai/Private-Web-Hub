@@ -21,10 +21,23 @@ class MainActivity : FlutterActivity() {
     private var remote: TvRemote? = null
     private var tvInput: TvInput? = null
     private var fullscreen = false
+    private var media: MediaPlayback? = null
+    val isTelevision get() = remote?.isTv == true
+    fun visibleWebView(): WebView? = findWebView(window.decorView)
 
-    override fun onStart() { super.onStart(); remote?.resume() }
-    override fun onStop() { remote?.pause(); super.onStop() }
-    override fun onDestroy() { tvInput?.dispose(); remote?.close(); super.onDestroy() }
+    override fun onUserLeaveHint() { media?.leave(); super.onUserLeaveHint() }
+    override fun onPictureInPictureModeChanged(active: Boolean, config: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(active, config)
+        media?.pipChanged(active)
+    }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.action == MediaPlayback.ACTION_AUDIO) media?.audioMode()
+    }
+
+    override fun onStart() { super.onStart(); remote?.resume(); media?.started() }
+    override fun onStop() { remote?.pause(); media?.stopped(); super.onStop() }
+    override fun onDestroy() { media?.detach(); tvInput?.dispose(); remote?.close(); super.onDestroy() }
     override fun onWindowFocusChanged(hasFocus: Boolean) { super.onWindowFocusChanged(hasFocus); if (hasFocus) tvInput?.refresh() }
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
@@ -37,9 +50,24 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) WebView.setWebContentsDebuggingEnabled(true)
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "mv/remote")
         remote = TvRemote(this, channel)
         tvInput = TvInput(this, channel)
+        val mediaChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "mv/media")
+        media = MediaPlayback(this, mediaChannel)
+        mediaChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "attach" -> {
+                    val owner = call.argument<String>("owner")
+                    val hosts = call.argument<List<String>>("hosts")
+                    if (owner == null || hosts == null) result.error("media", "Missing playback owner", null)
+                    else { media?.attach(owner, hosts, call.argument<Boolean>("allowSkip") == true); result.success(null) }
+                }
+                "detach" -> { media?.detach(call.argument<String>("owner")); result.success(null) }
+                else -> result.notImplemented()
+            }
+        }
         channel.setMethodCallHandler { call, result ->
             try {
                 when (call.method) {

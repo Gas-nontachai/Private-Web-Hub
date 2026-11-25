@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -10,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/catalog.dart';
 import '../core/ad_blocking.dart';
 import '../core/settings.dart';
+import '../core/media_playback.dart';
 import '../core/tv_remote.dart';
 import 'tv_remote_page.dart';
 import '../widgets/adguard_controls.dart';
@@ -41,6 +43,11 @@ class BrowserPage extends StatefulWidget {
 
 class _BrowserPageState extends State<BrowserPage> with RouteAware {
   static const _tapChannel = MethodChannel('mv/tap');
+  final _mediaOwner = MediaPlayback.newOwner();
+  bool get _supportsMedia => kDebugMode && !TvRemoteLink.instance.isTv;
+  void _mediaChanged() {
+    if (mounted) setState(() {});
+  }
 
   InAppWebViewController? _controller;
   UserScript? _script;
@@ -99,6 +106,8 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
     _resumeUrl =
         url?.uriValue ?? _currentUrl ?? widget.initialUrl ?? widget.site.url;
     _navigationEpoch++;
+    if (_supportsMedia) await MediaPlayback.instance.detach(_mediaOwner);
+    if (!mounted) return;
     setState(() {
       _script = null;
       _adguardScript = null;
@@ -151,6 +160,8 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    MediaPlayback.instance.removeListener(_mediaChanged);
+    MediaPlayback.instance.addListener(_mediaChanged);
     final route = ModalRoute.of(context);
     if (route is PageRoute && route != _route) {
       remoteRoutes.unsubscribe(this);
@@ -174,7 +185,23 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
   @override
   void didPop() => _active(false);
 
+  void _attachMedia() {
+    if (_supportsMedia) {
+      unawaited(
+        MediaPlayback.instance.attach(
+          _mediaOwner,
+          widget.catalog.allowedHosts,
+          allowSkip: const {'เพลง', 'วิดีโอ'}.contains(widget.site.category),
+        ),
+      );
+    }
+  }
+
   void _active(bool active) {
+    if (!active && _supportsMedia) {
+      unawaited(MediaPlayback.instance.detach(_mediaOwner));
+    }
+    if (active && _controller != null) _attachMedia();
     unawaited(TvRemoteLink.instance.browser(active));
   }
 
@@ -201,6 +228,8 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
       }, widget.catalog);
       await link.send({'action': 'open', 'url': url.toString()});
       if (mounted) {
+        if (_supportsMedia) await MediaPlayback.instance.detach(_mediaOwner);
+        if (!mounted) return;
         // Disposing the source WebView stops media even inside cross-origin frames.
         setState(() {
           _resumeUrl = url.uriValue;
@@ -293,6 +322,8 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
   @override
   void dispose() {
     remoteRoutes.unsubscribe(this);
+    MediaPlayback.instance.removeListener(_mediaChanged);
+    if (_supportsMedia) unawaited(MediaPlayback.instance.detach(_mediaOwner));
     _loadTimeout?.cancel();
     super.dispose();
   }
@@ -362,85 +393,98 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
                 ),
               )
             : null,
-        appBar: AppBar(
-          title: Text(widget.site.name),
-          actions: [
-            if (TvRemoteLink.instance.isTv)
-              IconButton(
-                tooltip: 'สลับเคอร์เซอร์ / เลือกปุ่ม (Menu บนรีโมต)',
-                icon: const Icon(Icons.mouse_outlined),
-                onPressed: () =>
-                    TvRemoteLink.instance.input({'action': 'cursor'}),
-              )
-            else
-              IconButton(
-                tooltip: _playingOnTv ? 'ควบคุม TV' : 'เปิดบน TV',
-                icon: const Icon(Icons.tv),
-                onPressed: _playingOnTv
-                    ? () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const TvRemotePage()),
+        appBar: MediaPlayback.instance.value
+            ? null
+            : AppBar(
+                title: Text(widget.site.name),
+                actions: [
+                  if (TvRemoteLink.instance.isTv)
+                    IconButton(
+                      tooltip: 'สลับเคอร์เซอร์ / เลือกปุ่ม (Menu บนรีโมต)',
+                      icon: const Icon(Icons.mouse_outlined),
+                      onPressed: () =>
+                          TvRemoteLink.instance.input({'action': 'cursor'}),
+                    )
+                  else
+                    IconButton(
+                      tooltip: _playingOnTv ? 'ควบคุม TV' : 'เปิดบน TV',
+                      icon: const Icon(Icons.tv),
+                      onPressed: _playingOnTv
+                          ? () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const TvRemotePage(),
+                              ),
+                            )
+                          : _sendToTv,
+                    ),
+                  IconButton(
+                    tooltip: 'Back',
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: _canGoBack ? () => _controller?.goBack() : null,
+                  ),
+                  IconButton(
+                    tooltip: 'Forward',
+                    icon: const Icon(Icons.arrow_forward),
+                    onPressed: _canGoForward
+                        ? () => _controller?.goForward()
+                        : null,
+                  ),
+                  IconButton(
+                    tooltip: 'Refresh',
+                    icon: const Icon(Icons.refresh),
+                    onPressed: () {
+                      setState(() => _error = null);
+                      _controller?.reload();
+                    },
+                  ),
+                  IconButton(
+                    tooltip: 'Home',
+                    icon: const Icon(Icons.home),
+                    onPressed: () =>
+                        Navigator.of(context)
+                            .popUntil((route) => route.isFirst),
+                  ),
+                  PopupMenuButton<String>(
+                    tooltip: 'Save page',
+                    icon: const Icon(Icons.bookmark_add_outlined),
+                    onSelected: (value) {
+                      if (value == 'adguard') {
+                        _showAdGuard();
+                      } else {
+                        _saveCurrentPage(value);
+                      }
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: 'adguard',
+                        child: Text('AdGuard และกฎเฉพาะเว็บ'),
+                      ),
+                      PopupMenuItem(
+                        value: 'favorite',
+                        child: Text('รายการโปรด'),
+                      ),
+                      PopupMenuItem(
+                        value: 'watchLater',
+                        child: Text('ดูภายหลัง'),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    tooltip: 'Open in external browser',
+                    icon: const Icon(Icons.open_in_browser),
+                    onPressed: () async {
+                      final url = await _controller?.getUrl();
+                      if (url != null) await _openExternal(url.uriValue);
+                    },
+                  ),
+                ],
+                bottom: _progress < 1
+                    ? PreferredSize(
+                        preferredSize: const Size.fromHeight(3),
+                        child: LinearProgressIndicator(value: _progress),
                       )
-                    : _sendToTv,
+                    : null,
               ),
-            IconButton(
-              tooltip: 'Back',
-              icon: const Icon(Icons.arrow_back),
-              onPressed: _canGoBack ? () => _controller?.goBack() : null,
-            ),
-            IconButton(
-              tooltip: 'Forward',
-              icon: const Icon(Icons.arrow_forward),
-              onPressed: _canGoForward ? () => _controller?.goForward() : null,
-            ),
-            IconButton(
-              tooltip: 'Refresh',
-              icon: const Icon(Icons.refresh),
-              onPressed: () {
-                setState(() => _error = null);
-                _controller?.reload();
-              },
-            ),
-            IconButton(
-              tooltip: 'Home',
-              icon: const Icon(Icons.home),
-              onPressed: () =>
-                  Navigator.of(context).popUntil((route) => route.isFirst),
-            ),
-            PopupMenuButton<String>(
-              tooltip: 'Save page',
-              icon: const Icon(Icons.bookmark_add_outlined),
-              onSelected: (value) {
-                if (value == 'adguard') {
-                  _showAdGuard();
-                } else {
-                  _saveCurrentPage(value);
-                }
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(
-                  value: 'adguard',
-                  child: Text('AdGuard และกฎเฉพาะเว็บ'),
-                ),
-                PopupMenuItem(value: 'favorite', child: Text('รายการโปรด')),
-                PopupMenuItem(value: 'watchLater', child: Text('ดูภายหลัง')),
-              ],
-            ),
-            IconButton(
-              tooltip: 'Open in external browser',
-              icon: const Icon(Icons.open_in_browser),
-              onPressed: () async {
-                final url = await _controller?.getUrl();
-                if (url != null) await _openExternal(url.uriValue);
-              },
-            ),
-          ],
-          bottom: _progress < 1
-              ? PreferredSize(
-                  preferredSize: const Size.fromHeight(3),
-                  child: LinearProgressIndicator(value: _progress),
-                )
-              : null,
-        ),
         body: _playingOnTv
             ? Center(
                 child: Column(
@@ -505,6 +549,7 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
                       javaScriptEnabled: true,
                       mediaPlaybackRequiresUserGesture: false,
                       allowsInlineMediaPlayback: true,
+                      allowBackgroundAudioPlaying: _supportsMedia,
                       mixedContentMode:
                           MixedContentMode.MIXED_CONTENT_NEVER_ALLOW,
                       supportMultipleWindows: false,
@@ -512,6 +557,7 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
                     ),
                     onWebViewCreated: (c) {
                       _controller = c;
+                      _attachMedia();
                       c.addJavaScriptHandler(
                         handlerName: 'mvAdguardRules',
                         callback: (args) async {
