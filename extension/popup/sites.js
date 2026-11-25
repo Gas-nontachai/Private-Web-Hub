@@ -29,5 +29,10 @@ const websites = [
     "name": "YouTube",
     "url": "https://www.youtube.com/",
     "mark": "YT"
+  },
+  {
+    "name": "YouTube Music",
+    "url": "https://music.youtube.com/",
+    "mark": "YTM"
   }
 ];

@@ -16,6 +16,7 @@ void main() {
       'Movie2FreeHD',
       'AnimeRuka',
       'YouTube',
+      'YouTube Music',
     ]);
     expect(c.sites.map((s) => s.id).toSet().length, c.sites.length);
     expect(c.sites.every((s) => s.url.scheme == 'https'), isTrue);
@@ -26,6 +27,7 @@ void main() {
       'หนัง',
       'อนิเมะ',
       'วิดีโอ',
+      'เพลง',
     ]);
   });
 
@@ -70,6 +72,13 @@ void main() {
         'เพลง & a+b',
       ).toString(),
       'https://www.youtube.com/results?search_query=%E0%B9%80%E0%B8%9E%E0%B8%A5%E0%B8%87+%26+a%2Bb',
+    );
+    expect(
+      buildSearchUri(
+        c.sites.singleWhere((s) => s.id == 'youtube-music'),
+        'เพลง & a+b',
+      ).toString(),
+      'https://music.youtube.com/search?q=%E0%B9%80%E0%B8%9E%E0%B8%A5%E0%B8%87+%26+a%2Bb',
     );
     expect(
       c.sites
@@ -119,7 +128,12 @@ void main() {
     NavDecision d(String u) => decideNavigation(Uri.parse(u), c);
     expect(d('https://www.037-hdd.com/x'), NavDecision.allowInApp);
     expect(d('http://www.037-hdd.com/x'), NavDecision.openExternal);
-    for (final host in ['youtube.com', 'www.youtube.com', 'm.youtube.com']) {
+    for (final host in [
+      'youtube.com',
+      'www.youtube.com',
+      'm.youtube.com',
+      'music.youtube.com',
+    ]) {
       expect(d('https://$host/watch?v=test'), NavDecision.allowInApp);
     }
     expect(d('https://ads.example/'), NavDecision.openExternal);
