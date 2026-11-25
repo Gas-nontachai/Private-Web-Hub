@@ -1,56 +1,47 @@
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:movieapps/src/core/ad_blocking.dart';
-import 'package:movieapps/src/core/catalog.dart';
 import 'package:movieapps/src/core/settings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  test('blocks exact ad hosts and subdomains, not lookalikes or URL text', () {
-    for (final domain in blockedAdHosts) {
-      expect(isBlockedAdUri(Uri.parse('https://$domain/ad.js')), true);
-      expect(isBlockedAdUri(Uri.parse('http://ads.$domain:8080/ad.js')), true);
-      expect(isBlockedAdUri(Uri.parse('https://not$domain/ad.js')), false);
-      expect(isBlockedAdUri(Uri.parse('https://$domain.example/ad.js')), false);
-      expect(
-        isBlockedAdUri(Uri.parse('https://example.com/?ad=$domain')),
-        false,
-      );
-    }
-    expect(isBlockedAdUri(Uri.parse('file://doubleclick.net/ad.js')), false);
+  test('resource types use metadata and never guess from URL suffixes', () {
+    expect(adGuardResourceType(null), 'Other');
+    expect(adGuardResourceType({'sec-fetch-dest': 'empty'}), 'Other');
     expect(
-      isBlockedAdUri(
-        Uri.parse('https://doubleclick.net@cdn.example/video.m3u8'),
-      ),
-      false,
+      adGuardResourceType({
+        'sec-fetch-dest': 'empty',
+        'X-Requested-With': 'XMLHttpRequest',
+      }),
+      'XmlHttpRequest',
     );
-  });
-  test('allows catalog sites and shared media CDNs', () {
-    final catalog = Catalog.parse(
-      File('assets/catalog/websites.json').readAsStringSync(),
-    );
-    for (final site in catalog.sites) {
-      expect(isBlockedAdUri(site.url), false);
-    }
-    for (final host in [
-      'cdn.jwplayer.com',
-      'cdn.jsdelivr.net',
-      'video.example',
-      'cloudfront.net',
-    ]) {
-      expect(isBlockedAdUri(Uri.https(host, '/video.m3u8')), false);
-    }
+    expect(adGuardResourceType({'Sec-Fetch-Dest': 'script'}), 'Script');
+    expect(adGuardResourceType({'sec-fetch-dest': 'iframe'}), 'SubDocument');
+    expect(adGuardResourceType({'sec-fetch-dest': 'video'}), 'Media');
+    expect(adGuardResourceType({'Accept': 'image/png'}), 'Other');
+    expect(adGuardResourceType(null, mainFrame: true), 'Document');
   });
   test(
-    'network blocking toggle persists independently from skip rules',
+    'existing master setting and independent per-site settings survive reload',
     () async {
-      SharedPreferences.setMockInitialValues({});
+      SharedPreferences.setMockInitialValues({
+        'block_ads_enabled': false,
+        'rules_enabled_global': true,
+      });
       final settings = await SiteSettings.load();
-      expect(settings.blockAdsEnabled, true);
-      await settings.setBlockAdsEnabled(false);
-      expect((await SiteSettings.load()).blockAdsEnabled, false);
-      expect(settings.globalEnabled, true);
+      expect(settings.blockAdsEnabled, false);
+      expect(settings.adGuardEnabled('a', 'network'), true);
+      await settings.setAdGuardEnabled('a', 'network', false);
+      await settings.setAdGuardEnabled('a', 'scriptlets', false);
+      final restored = await SiteSettings.load();
+      expect(restored.adGuardEnabled('a', 'network'), false);
+      expect(restored.adGuardEnabled('a', 'scriptlets'), false);
+      expect(restored.adGuardEnabled('a', 'cosmetic'), true);
+      expect(restored.adGuardEnabled('b', 'network'), true);
+      expect(restored.globalEnabled, true);
+      expect(
+        () => settings.setAdGuardEnabled('a', 'unknown', true),
+        throwsArgumentError,
+      );
     },
   );
 }

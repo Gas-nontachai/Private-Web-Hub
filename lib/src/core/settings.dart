@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -174,7 +175,18 @@ class SiteSettings {
   bool get globalEnabled => _prefs.getBool('rules_enabled_global') ?? true;
   bool get blockAdsEnabled => _prefs.getBool('block_ads_enabled') ?? true;
 
-  Future<void> setBlockAdsEnabled(bool value) => _prefs.setBool('block_ads_enabled', value);
+  Future<void> setBlockAdsEnabled(bool value) =>
+      _prefs.setBool('block_ads_enabled', value);
+
+  bool adGuardEnabled(String siteId, String feature) =>
+      _prefs.getBool('adguard_${siteId}_$feature') ?? true;
+
+  Future<void> setAdGuardEnabled(String siteId, String feature, bool value) {
+    if (!{'network', 'cosmetic', 'scriptlets'}.contains(feature)) {
+      throw ArgumentError.value(feature, 'feature');
+    }
+    return _prefs.setBool('adguard_${siteId}_$feature', value);
+  }
 
   Future<void> setGlobalEnabled(bool value) =>
       _prefs.setBool('rules_enabled_global', value);

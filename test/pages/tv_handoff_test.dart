@@ -76,7 +76,7 @@ void main() {
         tester.view.devicePixelRatio = 3;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
-        SharedPreferences.setMockInitialValues({});
+        SharedPreferences.setMockInitialValues({'block_ads_enabled': false});
         final platform = _WebPlatform();
         final previous = InAppWebViewPlatform.instance;
         InAppWebViewPlatform.instance = platform;
@@ -120,7 +120,9 @@ void main() {
             ),
           ),
         );
-        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
         await tester.pumpAndSettle();
         expect(platform.views, hasLength(1));
         await tester.tap(find.byTooltip('เปิดบน TV'));

@@ -24,6 +24,8 @@ flutter:
   assets:
     - assets/catalog/websites.json
     - assets/runtime/rule_runtime.js
+    - assets/adguard/
+    - assets/adguard/licenses/
   fonts:
     # Generated from assets/design/design_tokens.json.
     - family: Kanit

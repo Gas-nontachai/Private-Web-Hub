@@ -270,11 +270,17 @@ Release APKs retain the original application ID and signing configuration.
 
 ### Ad blocking and skip controls
 
-The Android app blocks resource requests to a small bundled set of known ad-network
-hosts before loading them. This is not the AdBlock extension or a full EasyList
-engine. **Settings → บล็อกการโหลดโฆษณา** controls this independently from automatic
-skipping; reopen the page after changing it. Main documents, catalog sites and
-normal media CDNs are not blocked by these host rules.
+The Android app now runs the AdGuard TSUrlFilter engine in a private Web Worker
+running on Android’s system WebView engine, with bundled Base, Tracking Protection and Mobile Ads filters (612,554
+rules), CSS/Extended CSS and scriptlets. Existing host-specific hiding and native
+skip controls remain independent. **Settings → AdGuard** is the master switch;
+per-site switches control requests, cosmetics and scriptlets. In a page, open the
+bookmark menu → **AdGuard และกฎเฉพาะเว็บ** and reload after changes.
+
+The engine and filters are bundled, with no runtime remote JavaScript or filter
+downloads. WebView does not expose every extension API, so this is not complete
+AdGuard Browser Extension parity. See [build instructions, compatibility rules,
+licenses and limitations](tool/adguard/README.md) before updating or distributing.
 
 The Chrome extension has a separate MV3 AdGuard integration using native DNR
 and TsWebExtension, with Base, Tracking Protection and Mobile Ads applied globally

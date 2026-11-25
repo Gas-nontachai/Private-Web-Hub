@@ -1,0 +1,29 @@
+{
+  "revision": "0ba847dd94469616a3032bb810275d12e0abe4b0",
+  "filters": [
+    {
+      "id": 2,
+      "name": "Base",
+      "url": "https://raw.githubusercontent.com/AdguardTeam/FiltersRegistry/0ba847dd94469616a3032bb810275d12e0abe4b0/platforms/extension/chromium/filters/2.txt",
+      "sha256": "329c7335d626ac464fd171ad25e6342a27a5f35a7914c3ce7e4c0b8004addf81",
+      "assetSha256": "a8a836fc015268be5754a0cb0f26ed873b8263e9b18aa933fce77d8b022e1b7b",
+      "conversionErrors": 0
+    },
+    {
+      "id": 3,
+      "name": "Spyware",
+      "url": "https://raw.githubusercontent.com/AdguardTeam/FiltersRegistry/0ba847dd94469616a3032bb810275d12e0abe4b0/platforms/extension/chromium/filters/3.txt",
+      "sha256": "78beb365708d2c41e2abedc4bbc1952728b361fa9eb1eb2514549c283e06e716",
+      "assetSha256": "cada86f745697d69da026b53780996219ea46af13765d2164a67fdab23e4081e",
+      "conversionErrors": 0
+    },
+    {
+      "id": 11,
+      "name": "Mobile",
+      "url": "https://raw.githubusercontent.com/AdguardTeam/FiltersRegistry/0ba847dd94469616a3032bb810275d12e0abe4b0/platforms/extension/chromium/filters/11.txt",
+      "sha256": "7057fd7ae2375be3e1c79fa033e9f3c5ae196de8c21f160a247acfcc5aa63cbc",
+      "assetSha256": "b9f6883263f864c5d84341e63de1c223479dba1bac2a3915f6a8e7da989f901d",
+      "conversionErrors": 0
+    }
+  ]
+}

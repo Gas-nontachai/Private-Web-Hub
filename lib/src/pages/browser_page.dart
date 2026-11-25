@@ -1,5 +1,6 @@
 import 'dart:collection';
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +12,7 @@ import '../core/ad_blocking.dart';
 import '../core/settings.dart';
 import '../core/tv_remote.dart';
 import 'tv_remote_page.dart';
+import '../widgets/adguard_controls.dart';
 
 enum BrowserLoadState { loading, loaded, failed }
 
@@ -42,6 +44,101 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
 
   InAppWebViewController? _controller;
   UserScript? _script;
+  UserScript? _adguardScript;
+  int _webRevision = 0;
+  int _navigationEpoch = 0;
+  Uri? _currentUrl;
+  String _settingsSnapshot = '';
+
+  String get _protectionSettings => [
+    widget.settings.blockAdsEnabled,
+    for (final feature in ['network', 'cosmetic', 'scriptlets'])
+      widget.settings.adGuardEnabled(widget.site.id, feature),
+    widget.settings.globalEnabled,
+    for (final site in widget.catalog.sites) widget.settings.isEnabled(site),
+  ].join(':');
+
+  Map<String, Object?> _filterContext(
+    Uri url,
+    Uri source, {
+    String type = 'Document',
+    String? method,
+  }) => {
+    'url': url.toString(),
+    'sourceUrl': source.toString(),
+    'siteId': widget.site.id,
+    'host': (type == 'Document' ? url : source).host.toLowerCase(),
+    'type': type,
+    'method': method,
+  };
+
+  Future<Map<String, dynamic>?> _pageRules(
+    String value,
+    String? referrer,
+  ) async {
+    final url = Uri.tryParse(value);
+    if (url == null ||
+        !{'http', 'https'}.contains(url.scheme) ||
+        value.length > 16384) {
+      return null;
+    }
+    final source = Uri.tryParse(referrer ?? '');
+    return AdGuardEngine.instance.getPageRules(
+      _filterContext(
+        url,
+        source != null && {'http', 'https'}.contains(source.scheme)
+            ? source
+            : url,
+      ),
+    );
+  }
+
+  Future<void> _reloadProtection() async {
+    final url = await _controller?.getUrl();
+    if (!mounted || _playingOnTv) return;
+    _resumeUrl =
+        url?.uriValue ?? _currentUrl ?? widget.initialUrl ?? widget.site.url;
+    _navigationEpoch++;
+    setState(() {
+      _script = null;
+      _adguardScript = null;
+      _controller = null;
+      _webRevision++;
+    });
+    await _prepareScript();
+  }
+
+  Future<void> _showAdGuard() async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('ตัวกรอง · ${widget.site.name}'),
+        content: SizedBox(
+          width: 440,
+          child: SingleChildScrollView(
+            child: AdGuardControls(
+              settings: widget.settings,
+              siteId: widget.site.id,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ปิด'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _reloadProtection();
+            },
+            child: const Text('โหลดหน้าใหม่'),
+          ),
+        ],
+      ),
+    );
+  }
+
   double _progress = 0;
   String? _error;
   bool _canGoBack = false;
@@ -65,7 +162,13 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
   @override
   void didPush() => _active(true);
   @override
-  void didPopNext() => _active(true);
+  void didPopNext() {
+    _active(true);
+    if (_settingsSnapshot != _protectionSettings) {
+      unawaited(_reloadProtection());
+    }
+  }
+
   @override
   void didPushNext() => _active(false);
   @override
@@ -126,8 +229,52 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
     final template = await rootBundle.loadString(
       'assets/runtime/rule_runtime.js',
     );
+    UserScript? adguardScript;
+    _settingsSnapshot = _protectionSettings;
+    if (widget.settings.blockAdsEnabled &&
+        await AdGuardEngine.instance.ensureReady()) {
+      final page = await rootBundle.loadString('assets/adguard/page.js');
+      final initial = _resumeUrl ?? widget.initialUrl ?? widget.site.url;
+      final rules = await _pageRules(initial.toString(), null);
+      final owned = <String, List<String>>{};
+      for (final site in widget.catalog.sites) {
+        if (!widget.settings.isEnabled(site)) continue;
+        for (final rule in site.rules.where((rule) => rule.enabled)) {
+          for (final host in rule.hosts) {
+            owned
+                .putIfAbsent(host, () => [])
+                .addAll(
+                  rule.actions
+                      .where((action) => action.type == 'hide')
+                      .expand((action) => action.selectors),
+                );
+          }
+        }
+      }
+      adguardScript = UserScript(
+        source: page.replaceAll(
+          '__MV_ADGUARD_CONFIG__',
+          jsonEncode({
+            'initialUrl': initial.toString(),
+            'initialRules': rules,
+            'owned': owned,
+            'cosmetic': widget.settings.adGuardEnabled(
+              widget.site.id,
+              'cosmetic',
+            ),
+            'scriptlets': widget.settings.adGuardEnabled(
+              widget.site.id,
+              'scriptlets',
+            ),
+          }),
+        ),
+        injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+        forMainFrameOnly: false,
+      );
+    }
     if (!mounted) return;
     setState(() {
+      _adguardScript = adguardScript;
       _script = UserScript(
         source: buildRuleScript(
           template,
@@ -262,8 +409,18 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
             PopupMenuButton<String>(
               tooltip: 'Save page',
               icon: const Icon(Icons.bookmark_add_outlined),
-              onSelected: _saveCurrentPage,
+              onSelected: (value) {
+                if (value == 'adguard') {
+                  _showAdGuard();
+                } else {
+                  _saveCurrentPage(value);
+                }
+              },
               itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: 'adguard',
+                  child: Text('AdGuard และกฎเฉพาะเว็บ'),
+                ),
                 PopupMenuItem(value: 'favorite', child: Text('รายการโปรด')),
                 PopupMenuItem(value: 'watchLater', child: Text('ดูภายหลัง')),
               ],
@@ -312,10 +469,20 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
                 ),
               )
             : script == null
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('กำลังเตรียมตัวกรองและหน้าเว็บ…'),
+                  ],
+                ),
+              )
             : Stack(
                 children: [
                   InAppWebView(
+                    key: ValueKey(_webRevision),
                     initialUrlRequest: URLRequest(
                       url: WebUri.uri(
                         (_resumeUrl ?? widget.initialUrl) != null &&
@@ -328,10 +495,13 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
                             : widget.site.url,
                       ),
                     ),
-                    initialUserScripts: UnmodifiableListView([script]),
+                    initialUserScripts: UnmodifiableListView([
+                      ?_adguardScript,
+                      script,
+                    ]),
                     initialSettings: InAppWebViewSettings(
-                      useShouldInterceptRequest:
-                          widget.settings.blockAdsEnabled,
+                      useShouldInterceptRequest: true,
+                      useOnRenderProcessGone: true,
                       javaScriptEnabled: true,
                       mediaPlaybackRequiresUserGesture: false,
                       allowsInlineMediaPlayback: true,
@@ -343,23 +513,95 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
                     onWebViewCreated: (c) {
                       _controller = c;
                       c.addJavaScriptHandler(
+                        handlerName: 'mvAdguardRules',
+                        callback: (args) async {
+                          if (!widget.settings.blockAdsEnabled ||
+                              args.isEmpty ||
+                              args[0] is! String) {
+                            return null;
+                          }
+                          final epoch = _navigationEpoch;
+                          final rules = await _pageRules(
+                            args[0] as String,
+                            args.length > 1 && args[1] is String
+                                ? args[1] as String
+                                : null,
+                          );
+                          return mounted && epoch == _navigationEpoch
+                              ? rules
+                              : null;
+                        },
+                      );
+                      c.addJavaScriptHandler(
                         handlerName: 'mvTap',
                         callback: (args) => _nativeTap(args),
                       );
                     },
                     shouldInterceptRequest: (_, request) async {
-                      if (widget.settings.blockAdsEnabled &&
-                          request.isForMainFrame != true &&
-                          isBlockedAdUri(request.url.uriValue)) {
-                        return WebResourceResponse(
-                          contentType: 'text/plain',
-                          contentEncoding: 'utf-8',
-                          statusCode: 204,
-                          reasonPhrase: 'No Content',
-                          data: Uint8List(0),
+                      if (!widget.settings.blockAdsEnabled ||
+                          !widget.settings.adGuardEnabled(
+                            widget.site.id,
+                            'network',
+                          ) ||
+                          request.isForMainFrame == true) {
+                        return null;
+                      }
+                      final url = request.url.uriValue;
+                      if (!{'http', 'https'}.contains(url.scheme)) return null;
+                      final epoch = _navigationEpoch;
+                      final referrers = (request.headers ?? <String, String>{})
+                          .entries
+                          .where(
+                            (entry) => entry.key.toLowerCase() == 'referer',
+                          );
+                      final referrer = referrers.isEmpty
+                          ? null
+                          : Uri.tryParse(referrers.first.value);
+                      final source =
+                          referrer != null &&
+                              {'http', 'https'}.contains(referrer.scheme)
+                          ? referrer
+                          : _currentUrl ?? widget.site.url;
+                      final result = await AdGuardEngine.instance
+                          .evaluateRequest(
+                            _filterContext(
+                              url,
+                              source,
+                              type: adGuardResourceType(request.headers),
+                              method: request.method,
+                            ),
+                          );
+                      if (!mounted ||
+                          epoch != _navigationEpoch ||
+                          result?['block'] != true) {
+                        return null;
+                      }
+                      final resource =
+                          AdGuardEngine.instance.redirects[result?['redirect']];
+                      final mime = resource?['contentType'] as String?;
+                      final content = resource?['content'] as String?;
+                      return WebResourceResponse(
+                        contentType:
+                            mime?.replaceAll(';base64', '') ?? 'text/plain',
+                        contentEncoding: mime?.endsWith(';base64') == true
+                            ? null
+                            : 'utf-8',
+                        statusCode: resource != null ? 200 : 204,
+                        reasonPhrase: resource != null ? 'OK' : 'No Content',
+                        data: content == null
+                            ? Uint8List(0)
+                            : mime!.endsWith(';base64')
+                            ? base64Decode(content)
+                            : Uint8List.fromList(utf8.encode(content)),
+                      );
+                    },
+                    onRenderProcessGone: (_, _) {
+                      _controller = null;
+                      if (mounted) {
+                        setState(
+                          () => _error = 'หน้าเว็บหยุดทำงาน · โหลดหน้าใหม่เพื่อลองอีกครั้ง',
                         );
                       }
-                      return null;
                     },
                     onReceivedIcon: (_, icon) =>
                         widget.settings.saveFavicon(widget.site.id, icon),
@@ -374,6 +616,8 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
                       return NavigationActionPolicy.CANCEL;
                     },
                     onLoadStart: (c, url) {
+                      _navigationEpoch++;
+                      _currentUrl = url?.uriValue;
                       _loadTimeout?.cancel();
                       final timeout = widget.loadTimeout;
                       if (timeout != null) {
@@ -412,6 +656,7 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
                       }
                     },
                     onUpdateVisitedHistory: (c, url, _) async {
+                      _currentUrl = url?.uriValue ?? _currentUrl;
                       await _refreshNavState();
                     },
                     onReceivedError: (c, request, error) {
@@ -442,12 +687,28 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
                           action: PermissionResponseAction.DENY,
                         ),
                   ),
+                  if (widget.settings.blockAdsEnabled && _adguardScript == null)
+                    const Align(
+                      alignment: Alignment.topCenter,
+                      child: Material(
+                        child: Padding(
+                          padding: EdgeInsets.all(12),
+                          child: Text(
+                            'AdGuard ไม่พร้อมใช้งาน · กฎเฉพาะเว็บยังทำงาน',
+                          ),
+                        ),
+                      ),
+                    ),
                   if (_error != null)
                     _ErrorView(
                       message: _error!,
                       onRetry: () {
                         setState(() => _error = null);
-                        _controller?.reload();
+                        if (_controller == null) {
+                          _reloadProtection();
+                        } else {
+                          _controller?.reload();
+                        }
                       },
                     ),
                 ],
