@@ -30,7 +30,7 @@ runs:
       run: |
         python3 tool/generate_shared.py --check
         python3 -m unittest discover -s tool/tests -p 'test_*.py'
-        node --test tool/tests/test_visibility.cjs
+        node --test tool/tests/test_visibility.cjs tool/tests/test_media_runtime.cjs
     - name: Validate bundled AdGuard
       shell: bash
       run: |

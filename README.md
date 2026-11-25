@@ -298,3 +298,31 @@ viewport coordinates, and relays acknowledgements through scaled iframe borders.
 Off-screen or unavailable bridge attempts do not consume the retry budget; each
 new visible ad resets it. Changes belong in the catalog and runtime templates;
 run `python3 tool/generate_shared.py` to update both platform outputs.
+
+### Mobile background playback preview
+
+This experiment is enabled only in debug builds pending real-device validation.
+This feature is enabled only in debug previews until real-device validation.
+Android mobile (API 26+) retains the current WebView player when leaving for PiP
+or audio-only playback. While video is playing, press Android Home to enter PiP;
+tap its headphones action to continue without the floating window. The media
+notification and lock screen expose play/pause and stop. Previous/next are only
+advertised for เพลง/วิดีโอ categories when a supported page button is enabled;
+other categories leave those controls disabled. Current skip navigation adapters
+cover YouTube and YouTube Music. This does not change Chrome Extension or TV
+playback. Closing the browser route or successfully sending it to TV stops the
+mobile session. Removing the app task stops its playback service; there is no
+restart/autoplay after process death.
+
+The native mediaPlayback foreground service and platform MediaSession control the
+same HTML player, with no extracted media URLs or second stream. WebView handles
+audio focus; unplugging audio pauses playback. Poll results are bound to the
+current owner/navigation. Only catalog HTTPS hosts are inspected. The first
+adapter reads top-document HTML video/audio: cross-origin iframe players, DRM,
+site background restrictions and device battery policies still need separate
+validation. Metadata currently uses title/artist without downloading artwork.
+
+Checks: `node --test tool/tests/test_media_runtime.cjs`, `flutter analyze`,
+`flutter test`, and an Android debug APK build. Emulator smoke checks cover PiP,
+audio-only and screen-off with a controlled HTML5 video fixture; this is not a
+15–30 minute real-device YouTube/YouTube Music playback certification.

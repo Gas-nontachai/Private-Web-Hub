@@ -1,3 +1,5 @@
+import '../core/media_playback.dart';
+
 import 'package:flutter/material.dart';
 
 import '../core/catalog.dart';
@@ -26,8 +28,9 @@ class _SearchPageState extends State<SearchPage> {
       .toList();
   late final Set<String> _selectedSites = widget.settings.searchSites == null
       ? _sites.map((site) => site.id).toSet()
-      : widget.settings.searchSites!
-            .intersection(_sites.map((site) => site.id).toSet());
+      : widget.settings.searchSites!.intersection(
+          _sites.map((site) => site.id).toSet(),
+        );
   late final Map<String, BrowserLoadState> _states = {
     for (final site in _sites) site.id: BrowserLoadState.loading,
   };
@@ -35,10 +38,8 @@ class _SearchPageState extends State<SearchPage> {
   Future<void> _showFilters() async {
     final selected = await showDialog<Set<String>>(
       context: context,
-      builder: (context) => _SearchFilterDialog(
-        sites: _sites,
-        selectedSites: _selectedSites,
-      ),
+      builder: (context) =>
+          _SearchFilterDialog(sites: _sites, selectedSites: _selectedSites),
     );
     if (selected == null) return;
     await widget.settings.setSearchSites(selected);
@@ -59,41 +60,44 @@ class _SearchPageState extends State<SearchPage> {
     return DefaultTabController(
       key: ValueKey(sites.map((site) => site.id).join(',')),
       length: sites.length,
-      child: Builder(
-        builder: (context) {
+      child: ValueListenableBuilder<bool>(
+        valueListenable: MediaPlayback.instance,
+        builder: (context, pip, child) {
           final tabs = DefaultTabController.of(context);
           return Scaffold(
-            appBar: AppBar(
-              title: Text('ผลค้นหา: ${widget.query}'),
-              actions: [
-                IconButton(
-                  tooltip: 'Filter',
-                  icon: const Icon(Icons.filter_list),
-                  onPressed: _showFilters,
-                ),
-              ],
-              bottom: PreferredSize(
-                preferredSize: Size.fromHeight(sites.isEmpty ? 0 : 48),
-                child: sites.isEmpty
-                    ? const SizedBox.shrink()
-                    : TabBar(
-                        isScrollable: true,
-                        tabs: [
-                          for (final site in sites)
-                            Tab(
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  _statusIcon(_states[site.id]!),
-                                  const SizedBox(width: 8),
-                                  Text(site.name),
-                                ],
-                              ),
-                            ),
-                        ],
+            appBar: pip
+                ? null
+                : AppBar(
+                    title: Text('ผลค้นหา: ${widget.query}'),
+                    actions: [
+                      IconButton(
+                        tooltip: 'Filter',
+                        icon: const Icon(Icons.filter_list),
+                        onPressed: _showFilters,
                       ),
-              ),
-            ),
+                    ],
+                    bottom: PreferredSize(
+                      preferredSize: Size.fromHeight(sites.isEmpty ? 0 : 48),
+                      child: sites.isEmpty
+                          ? const SizedBox.shrink()
+                          : TabBar(
+                              isScrollable: true,
+                              tabs: [
+                                for (final site in sites)
+                                  Tab(
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        _statusIcon(_states[site.id]!),
+                                        const SizedBox(width: 8),
+                                        Text(site.name),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                    ),
+                  ),
             body: sites.isEmpty
                 ? const Center(child: Text('เลือกเว็บเพื่อค้นหา'))
                 : AnimatedBuilder(

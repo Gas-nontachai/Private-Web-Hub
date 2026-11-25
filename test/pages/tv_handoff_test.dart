@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:movieapps/src/core/media_playback.dart';
 import 'package:movieapps/src/core/catalog.dart';
 import 'package:movieapps/src/core/settings.dart';
 import 'package:movieapps/src/core/tv_remote.dart';
@@ -77,6 +78,18 @@ void main() {
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
         SharedPreferences.setMockInitialValues({'block_ads_enabled': false});
+        final mediaCalls = <String>[];
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(MediaPlayback.channel, (call) async {
+              mediaCalls.add(call.method);
+              return null;
+            });
+        addTearDown(
+          () => TestDefaultBinaryMessengerBinding
+              .instance
+              .defaultBinaryMessenger
+              .setMockMethodCallHandler(MediaPlayback.channel, null),
+        );
         final platform = _WebPlatform();
         final previous = InAppWebViewPlatform.instance;
         InAppWebViewPlatform.instance = platform;
@@ -128,6 +141,7 @@ void main() {
         await tester.tap(find.byTooltip('เปิดบน TV'));
         await tester.pumpAndSettle();
         expect(platform.views.first.disposed, accepted);
+        expect(mediaCalls.contains("detach"), accepted);
         if (accepted) {
           expect(find.byType(TvRemotePage), findsOneWidget);
           await tester.pageBack();
