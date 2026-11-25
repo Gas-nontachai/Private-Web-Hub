@@ -1,0 +1,21 @@
+{
+  "name": "movie-extension-build",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@adguard/tswebextension": "5.0.3",
+    "esbuild": "0.25.12"
+  },
+  "overrides": {
+    "zod": "3.25.76",
+    "js-yaml": "3.15.2"
+  },
+  "devDependencies": {
+    "@adguard/dnr-rulesets": "5.0.20261013160024",
+    "playwright-core": "1.58.2"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test.mjs"
+  }
+}

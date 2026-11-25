@@ -76,6 +76,7 @@ def outputs(root=ROOT):
     selectors = [s for action in globals_[0]['actions'] for s in action['selectors']]
     if globals_[0].get('enabled', True):
         scripts.append({'matches': ['https://*/*', 'http://*/*'], 'js': ['content/adgate-skip-global.js'], 'run_at': 'document_start', 'all_frames': True, 'world': 'MAIN'})
+    scripts.append({'matches': ['https://*/*', 'http://*/*'], 'js': ['adguard/content.js'], 'run_at': 'document_start', 'all_frames': True, 'match_about_blank': True})
     manifest['content_scripts'] = scripts
     put('extension/manifest.json', json.dumps(manifest, indent=2) + '\n')
     visibility = (root / 'tool/templates/runtime/visibility.js').read_text()

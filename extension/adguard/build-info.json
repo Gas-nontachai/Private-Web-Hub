@@ -1,0 +1,25 @@
+{
+  "snapshot": "@adguard/dnr-rulesets@5.0.20261013160024",
+  "filters": [
+    {
+      "id": 0,
+      "sha256": "2e7056f50d496b749d035563c93dbf05741133ebc34e5b9f0cbccb6aea2b5720",
+      "entries": 1
+    },
+    {
+      "id": 2,
+      "sha256": "42a7da5641ee385c144ecaa3a46a262f406ae95937527cf375346dcad6323593",
+      "entries": 75728
+    },
+    {
+      "id": 3,
+      "sha256": "799e886534ee6858221775b915cc658d644965a88877550a8e5e023e92033167",
+      "entries": 119438
+    },
+    {
+      "id": 11,
+      "sha256": "a5845f1d26fdba09c9925c2bb6cfb2e3ea6fbe3bc71ab13ce4b28d5f21db44e3",
+      "entries": 1535
+    }
+  ]
+}

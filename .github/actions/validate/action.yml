@@ -31,6 +31,19 @@ runs:
         python3 tool/generate_shared.py --check
         python3 -m unittest discover -s tool/tests -p 'test_*.py'
         node --test tool/tests/test_visibility.cjs
+    - name: Validate bundled AdGuard
+      shell: bash
+      run: |
+        npm --prefix tool/adguard ci --ignore-scripts
+        npm --prefix tool/adguard run check
+        npm --prefix tool/adguard test
+    - name: Validate Chrome AdGuard
+      shell: bash
+      run: |
+        npm --prefix tool/extension ci --ignore-scripts
+        npm --prefix tool/extension run build
+        npm --prefix tool/extension test
+        python3 tool/generate_shared.py --check
     - name: Install Flutter NDK before Gradle configuration
       shell: bash
       run: python3 -m tool.android.install_ndk

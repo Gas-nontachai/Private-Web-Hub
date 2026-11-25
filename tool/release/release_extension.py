@@ -1,5 +1,6 @@
 """Release version and Manifest V3 validation (APK and ZIP only)."""
 import argparse
+import fnmatch
 import re
 
 
@@ -39,6 +40,15 @@ def validate_manifest(manifest, version, names):
             raise ValueError("Content script is missing host matches")
         resources.extend(script.get("js", []))
         resources.extend(script.get("css", []))
+    for ruleset in manifest.get("declarative_net_request", {}).get("rule_resources", []):
+        resources.append(ruleset.get("path"))
+    for group in manifest.get("web_accessible_resources", []):
+        for resource in group.get("resources", []):
+            if "*" in resource:
+                if not any(fnmatch.fnmatch(name, resource.lstrip("/")) for name in names):
+                    raise ValueError("Web accessible resource pattern has no packaged files")
+            else:
+                resources.append(resource.lstrip("/"))
     background = manifest.get("background", {})
     if background.get("service_worker"):
         resources.append(background["service_worker"])

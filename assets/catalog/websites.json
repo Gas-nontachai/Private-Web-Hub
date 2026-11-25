@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "2026.11.24",
+  "version": "2026.11.25",
   "sites": [
     {
       "id": "serieday",
@@ -143,6 +143,21 @@
           ]
         }
       ]
+    },
+    {
+      "id": "youtube",
+      "name": "YouTube",
+      "category": "วิดีโอ",
+      "mark": "YT",
+      "url": "https://www.youtube.com/",
+      "hosts": [
+        "youtube.com",
+        "www.youtube.com",
+        "m.youtube.com"
+      ],
+      "search": { "path": "/results", "queryKey": "search_query" },
+      "enabled": true,
+      "rules": []
     }
   ],
   "globalRules": [

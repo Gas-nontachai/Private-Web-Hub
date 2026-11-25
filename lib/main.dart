@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'src/core/catalog.dart';
+import 'src/core/ad_blocking.dart';
 import 'src/core/settings.dart';
 import 'src/core/tv_remote.dart';
 import 'src/pages/browser_page.dart';
@@ -16,6 +17,7 @@ Future<void> main() async {
   final settings = await SiteSettings.load();
   await TvRemoteLink.instance.initialize();
   runApp(MainApp(catalog: catalog, settings: settings));
+  if (settings.blockAdsEnabled) unawaited(AdGuardEngine.instance.ensureReady());
 }
 
 class MainApp extends StatefulWidget {

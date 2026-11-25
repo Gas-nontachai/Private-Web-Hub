@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import '../core/catalog.dart';
+import '../widgets/adguard_controls.dart';
 import '../core/settings.dart';
 import '../core/updates.dart';
 import '../theme/theme.dart';
@@ -97,14 +98,30 @@ class _SettingsPageState extends State<SettingsPage> {
             style: TextStyle(color: Palette.appTextMuted),
           ),
           const SizedBox(height: 26),
+          ExpansionTile(
+            title: const Text('AdGuard แยกตามเว็บไซต์'),
+            leading: const Icon(Icons.shield_outlined),
+            children: [
+              for (final site in catalog.sites)
+                ExpansionTile(
+                  title: Text(site.name),
+                  children: [
+                    AdGuardControls(settings: widget.settings, siteId: site.id),
+                  ],
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
           _sectionTitle(Icons.shield_outlined, 'Browsing rules'),
           const SizedBox(height: 10),
           _group([
             SwitchListTile(
               key: const ValueKey('toggle-block-ads'),
               secondary: const Icon(Icons.block),
-              title: const Text('บล็อกการโหลดโฆษณา'),
-              subtitle: const Text('บล็อกเครือข่ายโฆษณาที่รู้จัก · ปิดแล้วเปิดหน้าเว็บใหม่หากวิดีโอโหลดไม่ได้'),
+              title: const Text('AdGuard · บล็อกโฆษณาและ tracker'),
+              subtitle: const Text(
+                'ตัวกรอง Base, Tracking Protection และ Mobile Ads · โหลดหน้าใหม่หลังเปลี่ยนค่า',
+              ),
               value: widget.settings.blockAdsEnabled,
               onChanged: (value) async {
                 await widget.settings.setBlockAdsEnabled(value);
@@ -123,7 +140,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 if (mounted) setState(() {});
               },
             ),
-            for (final site in catalog.sites.take(_showAllSites ? catalog.sites.length : 3)) ...[
+            for (final site in catalog.sites.take(
+              _showAllSites ? catalog.sites.length : 3,
+            )) ...[
               const Divider(height: 1, indent: 72),
               SwitchListTile(
                 key: ValueKey('toggle-${site.id}'),
@@ -155,8 +174,12 @@ class _SettingsPageState extends State<SettingsPage> {
               const Divider(height: 1, indent: 72),
               TextButton.icon(
                 onPressed: () => setState(() => _showAllSites = !_showAllSites),
-                icon: Icon(_showAllSites ? Icons.expand_less : Icons.expand_more),
-                label: Text(_showAllSites ? 'Show fewer sites' : 'Show all sites'),
+                icon: Icon(
+                  _showAllSites ? Icons.expand_less : Icons.expand_more,
+                ),
+                label: Text(
+                  _showAllSites ? 'Show fewer sites' : 'Show all sites',
+                ),
               ),
             ],
           ]),

@@ -54,3 +54,5 @@ android/key.properties
 *.pem
 /dist/
 /extension-source/
+
+/extension/_metadata/
