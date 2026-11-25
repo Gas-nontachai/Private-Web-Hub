@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/catalog.dart';
+import '../core/browsing_data.dart';
 import '../core/settings.dart';
 import '../core/tv_remote.dart';
 import '../theme/theme.dart';
@@ -79,7 +80,7 @@ class _LibraryPageState extends State<LibraryPage> {
 
   Widget _collection(String key) {
     final query = widget.embedded ? widget.query : _query.text;
-    final pages = widget.settings
+    final pages = widget.settings.browsing
         .savedPages(key)
         .where(
           (p) => '${p.title} ${Uri.tryParse(p.url)?.host ?? ''}'
@@ -159,7 +160,7 @@ class _LibraryPageState extends State<LibraryPage> {
                             ),
                           ),
                     onRemove: () async {
-                      await widget.settings.removeSavedPage(entry);
+                      await widget.settings.browsing.removeSavedPage(entry);
                       if (mounted) setState(() {});
                     },
                   );

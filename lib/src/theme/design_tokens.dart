@@ -2,15 +2,7 @@
 import 'package:flutter/material.dart';
 
 class Palette {
-  static const body = Color(0xFF0E2F80);
   static const panel = Color(0xFF153D9B);
-  static const accent = Color(0xFFFFD52A);
-  static const accentSoft = Color(0xFFFFF9D9);
-  static const ink = Color(0xFF173A86);
-  static const mark = Color(0xFF173D9D);
-  static const markHover = Color(0xFF143B96);
-  static const muted = Color(0xFF6D7F9F);
-  static const white = Color(0xFFFFFFFF);
   static const border = Color(0x1FFFFFFF);
   static const appBackground = Color(0xFF121212);
   static const appSurface = Color(0xFF262626);

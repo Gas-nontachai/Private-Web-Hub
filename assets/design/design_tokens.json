@@ -1,14 +1,6 @@
 {
   "colors": {
-    "body": "#0E2F80",
     "panel": "#153D9B",
-    "accent": "#FFD52A",
-    "accentSoft": "#FFF9D9",
-    "ink": "#173A86",
-    "mark": "#173D9D",
-    "markHover": "#143B96",
-    "muted": "#6D7F9F",
-    "white": "#FFFFFF",
     "border": "#1FFFFFFF",
     "appBackground": "#121212",
     "appSurface": "#262626",

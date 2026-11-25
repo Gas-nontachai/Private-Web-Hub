@@ -1,6 +1,5 @@
 import 'dart:collection';
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -9,7 +8,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/catalog.dart';
-import '../core/ad_blocking.dart';
+import '../core/browser_protection.dart';
 import '../core/settings.dart';
 import '../core/media_playback.dart';
 import '../core/tv_remote.dart';
@@ -56,49 +55,11 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
   int _navigationEpoch = 0;
   Uri? _currentUrl;
   String _settingsSnapshot = '';
-
-  String get _protectionSettings => [
-    widget.settings.blockAdsEnabled,
-    for (final feature in ['network', 'cosmetic', 'scriptlets'])
-      widget.settings.adGuardEnabled(widget.site.id, feature),
-    widget.settings.globalEnabled,
-    for (final site in widget.catalog.sites) widget.settings.isEnabled(site),
-  ].join(':');
-
-  Map<String, Object?> _filterContext(
-    Uri url,
-    Uri source, {
-    String type = 'Document',
-    String? method,
-  }) => {
-    'url': url.toString(),
-    'sourceUrl': source.toString(),
-    'siteId': widget.site.id,
-    'host': (type == 'Document' ? url : source).host.toLowerCase(),
-    'type': type,
-    'method': method,
-  };
-
-  Future<Map<String, dynamic>?> _pageRules(
-    String value,
-    String? referrer,
-  ) async {
-    final url = Uri.tryParse(value);
-    if (url == null ||
-        !{'http', 'https'}.contains(url.scheme) ||
-        value.length > 16384) {
-      return null;
-    }
-    final source = Uri.tryParse(referrer ?? '');
-    return AdGuardEngine.instance.getPageRules(
-      _filterContext(
-        url,
-        source != null && {'http', 'https'}.contains(source.scheme)
-            ? source
-            : url,
-      ),
-    );
-  }
+  BrowserProtection get _protection => BrowserProtection(
+    catalog: widget.catalog,
+    site: widget.site,
+    settings: widget.settings,
+  );
 
   Future<void> _reloadProtection() async {
     final url = await _controller?.getUrl();
@@ -175,7 +136,7 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
   @override
   void didPopNext() {
     _active(true);
-    if (_settingsSnapshot != _protectionSettings) {
+    if (_settingsSnapshot != _protection.settingsSnapshot) {
       unawaited(_reloadProtection());
     }
   }
@@ -255,67 +216,14 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
   }
 
   Future<void> _prepareScript() async {
-    final template = await rootBundle.loadString(
-      'assets/runtime/rule_runtime.js',
+    _settingsSnapshot = _protection.settingsSnapshot;
+    final scripts = await _protection.prepareScripts(
+      _resumeUrl ?? widget.initialUrl ?? widget.site.url,
     );
-    UserScript? adguardScript;
-    _settingsSnapshot = _protectionSettings;
-    if (widget.settings.blockAdsEnabled &&
-        await AdGuardEngine.instance.ensureReady()) {
-      final page = await rootBundle.loadString('assets/adguard/page.js');
-      final initial = _resumeUrl ?? widget.initialUrl ?? widget.site.url;
-      final rules = await _pageRules(initial.toString(), null);
-      final owned = <String, List<String>>{};
-      for (final site in widget.catalog.sites) {
-        if (!widget.settings.isEnabled(site)) continue;
-        for (final rule in site.rules.where((rule) => rule.enabled)) {
-          for (final host in rule.hosts) {
-            owned
-                .putIfAbsent(host, () => [])
-                .addAll(
-                  rule.actions
-                      .where((action) => action.type == 'hide')
-                      .expand((action) => action.selectors),
-                );
-          }
-        }
-      }
-      adguardScript = UserScript(
-        source: page.replaceAll(
-          '__MV_ADGUARD_CONFIG__',
-          jsonEncode({
-            'initialUrl': initial.toString(),
-            'initialRules': rules,
-            'owned': owned,
-            'cosmetic': widget.settings.adGuardEnabled(
-              widget.site.id,
-              'cosmetic',
-            ),
-            'scriptlets': widget.settings.adGuardEnabled(
-              widget.site.id,
-              'scriptlets',
-            ),
-          }),
-        ),
-        injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
-        forMainFrameOnly: false,
-      );
-    }
     if (!mounted) return;
     setState(() {
-      _adguardScript = adguardScript;
-      _script = UserScript(
-        source: buildRuleScript(
-          template,
-          widget.catalog.sites,
-          widget.settings.isEnabled,
-          globalRules: widget.settings.globalEnabled
-              ? widget.catalog.globalRules
-              : const [],
-        ),
-        injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
-        forMainFrameOnly: false,
-      );
+      _adguardScript = scripts.adguard;
+      _script = scripts.rules;
     });
   }
 
@@ -567,7 +475,7 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
                             return null;
                           }
                           final epoch = _navigationEpoch;
-                          final rules = await _pageRules(
+                          final rules = await _protection.pageRules(
                             args[0] as String,
                             args.length > 1 && args[1] is String
                                 ? args[1] as String
@@ -583,62 +491,12 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
                         callback: (args) => _nativeTap(args),
                       );
                     },
-                    shouldInterceptRequest: (_, request) async {
-                      if (!widget.settings.blockAdsEnabled ||
-                          !widget.settings.adGuardEnabled(
-                            widget.site.id,
-                            'network',
-                          ) ||
-                          request.isForMainFrame == true) {
-                        return null;
-                      }
-                      final url = request.url.uriValue;
-                      if (!{'http', 'https'}.contains(url.scheme)) return null;
+                    shouldInterceptRequest: (_, request) {
                       final epoch = _navigationEpoch;
-                      final referrers = (request.headers ?? <String, String>{})
-                          .entries
-                          .where(
-                            (entry) => entry.key.toLowerCase() == 'referer',
-                          );
-                      final referrer = referrers.isEmpty
-                          ? null
-                          : Uri.tryParse(referrers.first.value);
-                      final source =
-                          referrer != null &&
-                              {'http', 'https'}.contains(referrer.scheme)
-                          ? referrer
-                          : _currentUrl ?? widget.site.url;
-                      final result = await AdGuardEngine.instance
-                          .evaluateRequest(
-                            _filterContext(
-                              url,
-                              source,
-                              type: adGuardResourceType(request.headers),
-                              method: request.method,
-                            ),
-                          );
-                      if (!mounted ||
-                          epoch != _navigationEpoch ||
-                          result?['block'] != true) {
-                        return null;
-                      }
-                      final resource =
-                          AdGuardEngine.instance.redirects[result?['redirect']];
-                      final mime = resource?['contentType'] as String?;
-                      final content = resource?['content'] as String?;
-                      return WebResourceResponse(
-                        contentType:
-                            mime?.replaceAll(';base64', '') ?? 'text/plain',
-                        contentEncoding: mime?.endsWith(';base64') == true
-                            ? null
-                            : 'utf-8',
-                        statusCode: resource != null ? 200 : 204,
-                        reasonPhrase: resource != null ? 'OK' : 'No Content',
-                        data: content == null
-                            ? Uint8List(0)
-                            : mime!.endsWith(';base64')
-                            ? base64Decode(content)
-                            : Uint8List.fromList(utf8.encode(content)),
+                      return _protection.interceptRequest(
+                        request,
+                        _currentUrl,
+                        isCurrent: () => mounted && epoch == _navigationEpoch,
                       );
                     },
                     onRenderProcessGone: (_, _) {
@@ -694,7 +552,7 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
                           decideNavigation(uri, widget.catalog) ==
                               NavDecision.allowInApp &&
                           _error == null) {
-                        await widget.settings.recordVisit(
+                        await widget.settings.browsing.recordVisit(
                           widget.site,
                           uri,
                           await c.getTitle(),
@@ -780,7 +638,7 @@ class _BrowserPageState extends State<BrowserPage> with RouteAware {
     final poster = rawPoster is String && rawPoster.trim().isNotEmpty
         ? url.uriValue.resolve(rawPoster.trim())
         : null;
-    await widget.settings.toggleSavedPage(
+    await widget.settings.browsing.toggleSavedPage(
       widget.site,
       url.uriValue,
       title,

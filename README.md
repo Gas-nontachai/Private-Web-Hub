@@ -17,7 +17,7 @@ Search currently displays each website's own results page in a source tab. It do
 lib/
   main.dart                  App startup
   src/
-    core/                    Catalog, local settings/history, update checks
+    core/                    Catalog, settings, browsing data, browser protection, updates
     pages/                   Home, browser, history and settings screens
     theme/                   Theme and generated design constants
 assets/

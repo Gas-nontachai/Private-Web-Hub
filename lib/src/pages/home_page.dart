@@ -137,13 +137,13 @@ class _HomePageState extends State<HomePage> {
                   ),
                 );
                 if (clear == true) {
-                  await widget.settings.clearHistory();
+                  await widget.settings.browsing.clearHistory();
                   if (mounted) setState(() {});
                 }
               }
             },
             itemBuilder: (_) => [
-              if (_tab == 2 && widget.settings.history.isNotEmpty)
+              if (_tab == 2 && widget.settings.browsing.history.isNotEmpty)
                 const PopupMenuItem(
                   value: 'clear-history',
                   child: Text('ล้างประวัติ'),

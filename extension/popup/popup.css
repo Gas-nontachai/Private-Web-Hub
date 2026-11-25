@@ -155,15 +155,7 @@ h1 {
   background: #ff5263;
 }
 
-.adguard-panel { margin-bottom: 16px; padding: 12px; background: var(--appSurfaceActive); border-radius: 8px; }
-.adguard-toggle { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:44px; cursor:pointer; }
-.adguard-toggle input { width:20px; height:20px; accent-color:#b4538c; }
-.adguard-toggle input:focus-visible { outline:2px solid var(--appText); outline-offset:3px; }
-.adguard-host,.adguard-status,.adguard-note { margin:6px 0; overflow-wrap:anywhere; font-size:12px; }
-.adguard-note { color:var(--appTextMuted); }
-#adguard-reload { min-height:36px; padding:6px 12px; cursor:pointer; font:inherit; }
-
-.adguard-panel { margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--appTextMuted); }
+.adguard-panel { margin-bottom: 16px; padding: 12px; padding-bottom: 14px; background: var(--appSurfaceActive); border-radius: 8px; border-bottom: 1px solid var(--appTextMuted); }
 .adguard-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; cursor: pointer; }
 .adguard-toggle input { width: 20px; height: 20px; accent-color: #b4538c; }
 .adguard-toggle input:focus-visible { outline: 2px solid var(--appText); outline-offset: 3px; }

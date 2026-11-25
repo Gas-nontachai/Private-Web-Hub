@@ -68,7 +68,7 @@ class _HistoryPageState extends State<HistoryPage> {
           ),
         ) ==
         true) {
-      await widget.settings.clearHistory();
+      await widget.settings.browsing.clearHistory();
       setState(() {});
     }
   }
@@ -76,7 +76,7 @@ class _HistoryPageState extends State<HistoryPage> {
   @override
   Widget build(BuildContext context) {
     final query = widget.embedded ? widget.query : _query.text;
-    final history = widget.settings.history
+    final history = widget.settings.browsing.history
         .where(
           (e) => '${e.title} ${e.url}'.toLowerCase().contains(
             query.trim().toLowerCase(),
@@ -159,7 +159,7 @@ class _HistoryPageState extends State<HistoryPage> {
                         tooltip: 'Remove',
                         icon: const Icon(Icons.close),
                         onPressed: () async {
-                          await widget.settings.removeVisit(entry);
+                          await widget.settings.browsing.removeVisit(entry);
                           setState(() {});
                         },
                       ),
