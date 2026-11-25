@@ -98,6 +98,17 @@
     },
     {
       "matches": [
+        "https://music.youtube.com/*",
+        "http://music.youtube.com/*"
+      ],
+      "css": [
+        "rules/youtube-music.css"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
         "https://*/*",
         "http://*/*"
       ],

@@ -158,6 +158,19 @@
       "search": { "path": "/results", "queryKey": "search_query" },
       "enabled": true,
       "rules": []
+    },
+    {
+      "id": "youtube-music",
+      "name": "YouTube Music",
+      "category": "เพลง",
+      "mark": "YTM",
+      "url": "https://music.youtube.com/",
+      "hosts": [
+        "music.youtube.com"
+      ],
+      "search": { "path": "/search", "queryKey": "q" },
+      "enabled": true,
+      "rules": []
     }
   ],
   "globalRules": [
