@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "description": "Hide advertisements on supported websites",
   "host_permissions": [
-    "https://api.github.com/*"
+    "http://*/*",
+    "https://*/*"
   ],
   "icons": {
     "16": "icons/icon16.png",
@@ -91,6 +92,63 @@
       "run_at": "document_start",
       "all_frames": true,
       "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://*/*",
+        "http://*/*"
+      ],
+      "js": [
+        "adguard/content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_about_blank": true
+    }
+  ],
+  "minimum_chrome_version": "121",
+  "background": {
+    "service_worker": "adguard/background.js"
+  },
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "scripting",
+    "tabs",
+    "webNavigation",
+    "webRequest",
+    "cookies",
+    "declarativeNetRequest"
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "ruleset_2",
+        "enabled": false,
+        "path": "adguard/filters/declarative/ruleset_2/ruleset_2.json"
+      },
+      {
+        "id": "ruleset_3",
+        "enabled": false,
+        "path": "adguard/filters/declarative/ruleset_3/ruleset_3.json"
+      },
+      {
+        "id": "ruleset_11",
+        "enabled": false,
+        "path": "adguard/filters/declarative/ruleset_11/ruleset_11.json"
+      }
+    ]
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "web-accessible-resources/redirects/*"
+      ],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "use_dynamic_url": true
     }
   ]
 }

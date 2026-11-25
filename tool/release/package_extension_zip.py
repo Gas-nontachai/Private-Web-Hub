@@ -8,7 +8,7 @@ import zipfile
 
 from tool.release.release_extension import release_version, chrome_version, validate_manifest
 
-EXCLUDE_DIRS = {".git", ".github", "__pycache__"}
+EXCLUDE_DIRS = {".git", ".github", "__pycache__", "_metadata"}
 SECRET_SUFFIXES = {".pem", ".key", ".keystore", ".jks", ".crx", ".zip"}
 
 def package(source: Path, tag: str, output: Path):

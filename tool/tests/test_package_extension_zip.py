@@ -34,6 +34,21 @@ class ExtensionZipTests(unittest.TestCase):
             self.assertEqual(manifest["version"], "1.0.1")
         self.assertEqual((self.source / "manifest.json").read_bytes(), original)
 
+    def test_browser_metadata_excluded(self):
+        metadata = self.source / '_metadata'
+        metadata.mkdir(exist_ok=True)
+        (metadata / 'test').write_text('Chrome generated cache')
+        package(self.source, 'v1.0.1', self.output)
+        with zipfile.ZipFile(self.output) as archive:
+            self.assertFalse(any(name.startswith('_metadata/') for name in archive.namelist()))
+
+    def test_missing_adguard_resources_fail(self):
+        manifest = json.loads((self.source / 'manifest.json').read_text())
+        resource = self.source / manifest['declarative_net_request']['rule_resources'][0]['path']
+        resource.unlink()
+        with self.assertRaisesRegex(ValueError, 'missing packaged resource'):
+            package(self.source, 'v1.0.1', self.output)
+
     def test_missing_popup_dependencies_fail(self):
         for name in ('popup/sites.js', 'popup/shared.css', 'assets/fonts/Kanit-Regular.ttf'):
             with self.subTest(name=name):

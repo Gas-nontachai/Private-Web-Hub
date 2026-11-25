@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="popup.css">
     <script src="sites.js" defer></script>
     <script src="popup.js" defer></script>
+    <script src="adguard.js" defer></script>
   </head>
   <body>
     <main class="popup">
@@ -18,6 +19,14 @@
           <span id="update-badge" class="update-badge" hidden></span>
         </button>
       </header>
+      <section class="adguard-panel" aria-label="ตั้งค่า AdGuard">
+        <label class="adguard-toggle"><span>AdGuard · ทั่วเว็บ</span><input id="adguard-enabled" type="checkbox" disabled></label>
+        <label class="adguard-toggle"><span>ป้องกันเว็บไซต์นี้</span><input id="adguard-site" type="checkbox" disabled></label>
+        <p id="adguard-host" class="adguard-host"></p>
+        <p id="adguard-status" class="adguard-status" role="status">กำลังเตรียมตัวกรอง…</p>
+        <p class="adguard-note">กฎเฉพาะเว็บและการกด Skip ของ Movie.exe ทำงานแยกจาก AdGuard</p>
+        <button id="adguard-reload" type="button" hidden>โหลดหน้าเว็บใหม่</button>
+      </section>
       <section aria-label="เว็บไซต์ที่รองรับ">
         <nav id="site-list" class="site-list" aria-label="เปิดเว็บไซต์"></nav>
       </section>

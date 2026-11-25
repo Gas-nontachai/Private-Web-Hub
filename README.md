@@ -276,6 +276,13 @@ engine. **Settings → บล็อกการโหลดโฆษณา** con
 skipping; reopen the page after changing it. Main documents, catalog sites and
 normal media CDNs are not blocked by these host rules.
 
+The Chrome extension has a separate MV3 AdGuard integration using native DNR
+and TsWebExtension, with Base, Tracking Protection and Mobile Ads applied globally
+to permitted HTTP/HTTPS pages. Its popup controls the master switch and a per-host
+exception. Existing Movie.exe hide/skip rules stay independent. Chrome settings,
+engine builds and assets are separate from Android; see
+[Chrome build, installation and limitations](tool/extension/README.md).
+
 Skip targets include the original ad-gate button and ready JW Player skip controls.
 Exact Thai/English skip labels are considered only inside active ad-player
 containers. Chrome runs the reviewed skip script in the page's MAIN world so it
