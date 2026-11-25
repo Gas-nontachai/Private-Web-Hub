@@ -83,6 +83,21 @@
     },
     {
       "matches": [
+        "https://youtube.com/*",
+        "http://youtube.com/*",
+        "https://www.youtube.com/*",
+        "http://www.youtube.com/*",
+        "https://m.youtube.com/*",
+        "http://m.youtube.com/*"
+      ],
+      "css": [
+        "rules/youtube.css"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
         "https://*/*",
         "http://*/*"
       ],

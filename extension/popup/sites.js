@@ -24,5 +24,10 @@ const websites = [
     "name": "AnimeRuka",
     "url": "https://animeruka.com/",
     "mark": "AR"
+  },
+  {
+    "name": "YouTube",
+    "url": "https://www.youtube.com/",
+    "mark": "YT"
   }
 ];
